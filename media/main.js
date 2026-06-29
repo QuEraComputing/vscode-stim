@@ -259,12 +259,17 @@
     return wrap;
   }
 
+  // What the view currently shows, so resize handling knows whether to re-fit.
+  let currentKind = null;
+
   function showSingle(svg) {
+    currentKind = "svg";
     view.replaceChildren(makeZoomable(svg, { fill: true }));
   }
 
   // Interactive 3D viewer: stim's self-contained HTML page in an iframe.
   function showHtml(html) {
+    currentKind = "html";
     const frame = document.createElement("iframe");
     frame.className = "viewer-iframe";
     frame.srcdoc = html;
@@ -272,11 +277,25 @@
   }
 
   function showError(message) {
+    currentKind = "error";
     const pre = document.createElement("pre");
     pre.className = "error";
     pre.textContent = message;
     view.replaceChildren(pre);
   }
+
+  // When the panel finishes resizing, re-render the SVG so it re-fits the new
+  // size. Skipped for the 3D iframe (re-rendering would reset the orbit camera).
+  let resizeTimer = null;
+  window.addEventListener("resize", () => {
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      resizeTimer = null;
+      if (currentKind === "svg") {
+        vscode.postMessage({ command: "refresh" });
+      }
+    }, 200);
+  });
 
   window.addEventListener("message", (event) => {
     const msg = event.data;

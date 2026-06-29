@@ -156,6 +156,9 @@ export class StimPanel {
         rows: this.rows,
       });
       this.refresh();
+    } else if (msg.command === "refresh") {
+      // Requested by the webview after the panel finishes resizing.
+      this.refresh();
     } else if (msg.command === "setBase") {
       this.base = msg.base;
       this.refresh();
