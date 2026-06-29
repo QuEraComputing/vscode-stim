@@ -15,6 +15,7 @@
   const fullBtn = document.getElementById("toggle-full");
   const rowsControl = document.getElementById("rows-control");
   const rowsInput = document.getElementById("rows-input");
+  const infoTip = document.getElementById("info-tip");
 
   let state = {
     bases: [],
@@ -348,6 +349,31 @@
     view.replaceChildren(pre);
   }
 
+  // Fill the info tooltip with the circuit's summary counts.
+  function renderStats(stats) {
+    if (!stats) return;
+    if (stats.error) {
+      infoTip.innerHTML = '<div class="info-error">Cannot parse circuit</div>';
+      return;
+    }
+    const rows = [
+      ["Qubits", stats.qubits],
+      ["Measurements", stats.measurements],
+      ["Detectors", stats.detectors],
+      ["Observables", stats.observables],
+      ["Ticks", stats.ticks],
+      ["Sweep bits", stats.sweepBits],
+    ];
+    infoTip.innerHTML =
+      '<div class="info-title">Circuit</div>' +
+      rows
+        .map(
+          ([k, v]) =>
+            `<div class="info-row"><span class="info-k">${k}</span><span class="info-v">${v}</span></div>`
+        )
+        .join("");
+  }
+
   // When the panel finishes resizing, re-render the SVG so it re-fits the new
   // size. Skipped for the 3D iframe (re-rendering would reset the orbit camera).
   let resizeTimer = null;
@@ -395,6 +421,8 @@
       showSingle(msg.svg);
     } else if (msg.command === "error") {
       showError(msg.message);
+    } else if (msg.command === "stats") {
+      renderStats(msg.stats);
     }
   });
 

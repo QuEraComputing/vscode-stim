@@ -44,7 +44,18 @@ interface StimModule {
     approxDisjoint: boolean
   ): string;
   count_ticks(text: string): number;
+  circuit_stats_json(text: string): string;
   gate_data_json(): string;
+}
+
+export interface CircuitStats {
+  qubits: number;
+  measurements: number;
+  detectors: number;
+  observables: number;
+  ticks: number;
+  sweepBits: number;
+  error?: string;
 }
 
 export interface GateInfo {
@@ -132,6 +143,18 @@ export async function getGateData(): Promise<GateInfo[]> {
       });
   }
   return gateDataPromise;
+}
+
+// Summary counts for the circuit (qubits, measurements, detectors, ...), or an
+// object with `error` set if it cannot be parsed.
+export async function getCircuitStats(circuitText: string): Promise<CircuitStats> {
+  const mod = await loadModule();
+  try {
+    return JSON.parse(mod.circuit_stats_json(circuitText)) as CircuitStats;
+  } catch (e: any) {
+    modulePromise = undefined;
+    throw new Error(`stim failed to read circuit stats: ${String(e?.message ?? e)}`);
+  }
 }
 
 // Number of TICK instructions in the circuit (-1 if it cannot be parsed).

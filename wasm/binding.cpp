@@ -182,9 +182,32 @@ static int count_ticks(std::string circuit_text) {
     }
 }
 
+// Returns the circuit's summary counts as JSON, or {"error": "..."} if it
+// cannot be parsed. Drives the toolbar info tooltip.
+static std::string circuit_stats_json(std::string circuit_text) {
+    try {
+        Circuit c{std::string_view(circuit_text)};
+        std::string out = "{";
+        out += "\"qubits\":" + std::to_string((uint64_t)c.count_qubits());
+        out += ",\"measurements\":" + std::to_string((uint64_t)c.count_measurements());
+        out += ",\"detectors\":" + std::to_string((uint64_t)c.count_detectors());
+        out += ",\"observables\":" + std::to_string((uint64_t)c.count_observables());
+        out += ",\"ticks\":" + std::to_string((uint64_t)c.count_ticks());
+        out += ",\"sweepBits\":" + std::to_string((uint64_t)c.count_sweep_bits());
+        out += "}";
+        return out;
+    } catch (const std::exception &e) {
+        std::string out = "{\"error\":\"";
+        json_escape_to(e.what(), out);
+        out += "\"}";
+        return out;
+    }
+}
+
 EMSCRIPTEN_BINDINGS(stim_diagram) {
     function("diagram", &diagram);
     function("diagram_full", &diagram_full);
     function("count_ticks", &count_ticks);
+    function("circuit_stats_json", &circuit_stats_json);
     function("gate_data_json", &gate_data_json);
 }

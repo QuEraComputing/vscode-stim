@@ -7,6 +7,7 @@ import {
   renderDiagram,
   renderDiagramFull,
   countTicks,
+  getCircuitStats,
   isHtmlDiagram,
   DiagramType,
 } from "./stimEngine";
@@ -216,6 +217,7 @@ export class StimPanel {
 
   async refresh() {
     const text = this.doc.getText();
+    void this.sendStats(text);
     const type = this.currentType();
     const dependent = this.isTickDependent();
     // "without noise" only applies where the toggle is shown: not for the match
@@ -269,6 +271,16 @@ export class StimPanel {
         command: "error",
         message: String(e?.message ?? e),
       });
+    }
+  }
+
+  // Send circuit summary counts to the webview's info tooltip.
+  private async sendStats(text: string) {
+    try {
+      const stats = await getCircuitStats(text);
+      this.panel.webview.postMessage({ command: "stats", stats });
+    } catch {
+      // Ignore; the tooltip just keeps its previous content.
     }
   }
 
@@ -377,6 +389,12 @@ export class StimPanel {
         <button id="tick-next" class="step" title="Next layer (→ or e; shift+e = +5, end = last)">▶</button>
       </div>
     </div>
+    <span id="info-wrap">
+      <button id="info-btn" aria-label="Circuit info">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+      </button>
+      <div id="info-tip" role="tooltip"></div>
+    </span>
   </div>
   <div id="view"></div>
   <script src="${scriptUri}"></script>
