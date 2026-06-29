@@ -145,17 +145,33 @@
     tickNext.disabled = state.tickMax > 0 && state.tick >= state.tickMax;
   }
 
-  // Arrow keys step the tick when the single-tick stepper is active.
+  // Keyboard navigation through the tick/layer stepper. Active only when the
+  // single-tick stepper is shown (slice diagram, not full mode) and focus isn't
+  // in an input. Keys:
+  //   ← / q : previous layer       → / e : next layer
+  //   shift+q : back 5             shift+e : forward 5
+  //   home : first layer           end : last layer
+  function jumpTick(target) {
+    setTick(target);
+  }
   window.addEventListener("keydown", (e) => {
     if (!isTickDependent() || state.full) return;
     if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
-    if (e.key === "ArrowLeft") {
-      setTick(state.tick - 1);
-      e.preventDefault();
-    } else if (e.key === "ArrowRight") {
-      setTick(state.tick + 1);
-      e.preventDefault();
+    const last = state.tickMax > 0 ? state.tickMax : 1e6;
+    const key = e.key.toLowerCase();
+    let handled = true;
+    if (e.key === "ArrowRight" || key === "e") {
+      setTick(state.tick + (e.shiftKey ? 5 : 1));
+    } else if (e.key === "ArrowLeft" || key === "q") {
+      setTick(state.tick - (e.shiftKey ? 5 : 1));
+    } else if (e.key === "Home") {
+      jumpTick(1);
+    } else if (e.key === "End") {
+      jumpTick(last);
+    } else {
+      handled = false;
     }
+    if (handled) e.preventDefault();
   });
 
   // Wrap a raw SVG string in a zoomable, scrollable container. Ctrl/Cmd + wheel

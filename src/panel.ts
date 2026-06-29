@@ -305,9 +305,9 @@ export class StimPanel {
     </span>
     <div id="tick-control">
       <div class="stepper">
-        <button id="tick-prev" class="step" title="Previous tick (←)">◀</button>
+        <button id="tick-prev" class="step" title="Previous layer (← or q; shift+q = −5, home = first)">◀</button>
         <span id="tick-value" class="step-value">1</span>
-        <button id="tick-next" class="step" title="Next tick (→)">▶</button>
+        <button id="tick-next" class="step" title="Next layer (→ or e; shift+e = +5, end = last)">▶</button>
       </div>
     </div>
   </div>
