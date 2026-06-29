@@ -11,6 +11,7 @@
   const tickNext = document.getElementById("tick-next");
   const opsBtn = document.getElementById("toggle-ops");
   const noiseBtn = document.getElementById("toggle-noise");
+  const approxBtn = document.getElementById("toggle-approx");
   const fullBtn = document.getElementById("toggle-full");
   const rowsControl = document.getElementById("rows-control");
   const rowsInput = document.getElementById("rows-input");
@@ -23,6 +24,7 @@
     dim: "2d",
     withOps: false,
     withoutNoise: false,
+    approxDisjoint: true,
     full: false,
     tick: 1,
     tickMax: 0,
@@ -84,6 +86,9 @@
       state.base !== "matchgraph" && !(state.base === "detslice" && !state.withOps);
     noiseBtn.style.display = noiseVisible ? "" : "none";
     setPressed(noiseBtn, state.withoutNoise);
+    // "approx. disjoint errors" only affects the match graph's error model.
+    approxBtn.style.display = state.base === "matchgraph" ? "" : "none";
+    setPressed(approxBtn, state.approxDisjoint);
     // Full mode only applies to slice (tick-dependent) types.
     fullBtn.style.display = dependent ? "" : "none";
     setPressed(fullBtn, state.full && dependent);
@@ -113,6 +118,12 @@
     state.withoutNoise = !state.withoutNoise;
     updateControls();
     vscode.postMessage({ command: "setWithoutNoise", value: state.withoutNoise });
+  });
+
+  approxBtn.addEventListener("click", () => {
+    state.approxDisjoint = !state.approxDisjoint;
+    updateControls();
+    vscode.postMessage({ command: "setApproxDisjoint", value: state.approxDisjoint });
   });
 
   fullBtn.addEventListener("click", () => {
@@ -329,6 +340,7 @@
       state.dim = msg.threeD ? "3d" : "2d";
       state.withOps = msg.withOps;
       state.withoutNoise = msg.withoutNoise;
+      state.approxDisjoint = msg.approxDisjoint !== false;
       state.full = msg.full;
       state.tick = msg.tick;
       state.rows = msg.rows || 0;

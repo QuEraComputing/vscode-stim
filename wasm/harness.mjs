@@ -18,7 +18,7 @@ const ERROR_PREFIX = "ERROR";
 const Module = await createStimModule();
 
 function check(type, tick, mustContain) {
-  const svg = Module.diagram(SAMPLE, type, tick, false);
+  const svg = Module.diagram(SAMPLE, type, tick, false, true);
   assert.ok(!svg.startsWith("\x01" + ERROR_PREFIX), `${type} errored: ${svg}`);
   assert.ok(svg.includes(mustContain), `${type} missing ${mustContain}`);
   console.log(`OK ${type} (${svg.length} bytes)`);
@@ -28,13 +28,13 @@ check("timeslice-svg", 1, "<svg");
 check("detslice-svg", 1, "<svg");
 check("detslice-with-ops-svg", 1, "<svg");
 check("matchgraph-svg", 0, "<svg");
-const bad = Module.diagram("NOT_A_GATE 0", "timeline-svg", 0, false);
+const bad = Module.diagram("NOT_A_GATE 0", "timeline-svg", 0, false, true);
 assert.ok(bad.startsWith("\x01" + ERROR_PREFIX), "expected error sentinel for bad circuit");
 console.log("OK error path");
 
 // without_noise: drawing the noise-free circuit must drop the X_ERROR op.
-const withNoise = Module.diagram(SAMPLE, "timeline-svg", 0, false);
-const noNoise = Module.diagram(SAMPLE, "timeline-svg", 0, true);
+const withNoise = Module.diagram(SAMPLE, "timeline-svg", 0, false, true);
+const noNoise = Module.diagram(SAMPLE, "timeline-svg", 0, true, true);
 assert.ok(withNoise.includes("ERR") || withNoise.includes("X_ERROR"), "expected noise marker in noisy diagram");
 assert.ok(!noNoise.includes("X_ERROR"), "without_noise should remove X_ERROR");
 assert.ok(noNoise.length < withNoise.length, "noise-free diagram should be smaller");
@@ -47,8 +47,8 @@ console.log("OK count_ticks");
 
 // diagram_full: combined all-tick diagram; rows changes the layout.
 const vb = (s) => /viewBox="[^"]*\s([\d.]+)\s+([\d.]+)"/.exec(s);
-const fullAuto = Module.diagram_full(SAMPLE, "timeslice-svg", 0, false);
-const fullRow1 = Module.diagram_full(SAMPLE, "timeslice-svg", 1, false);
+const fullAuto = Module.diagram_full(SAMPLE, "timeslice-svg", 0, false, true);
+const fullRow1 = Module.diagram_full(SAMPLE, "timeslice-svg", 1, false, true);
 assert.ok(fullAuto.includes("<svg"), "diagram_full should produce svg");
 assert.ok(vb(fullAuto) && vb(fullRow1), "diagram_full svgs should have viewBox");
 assert.notStrictEqual(vb(fullAuto)[0], vb(fullRow1)[0], "rows should change the layout");
@@ -67,11 +67,25 @@ console.log(`OK gate_data_json (${gates.length} gates)`);
 
 // 3D HTML viewers: self-contained THREE.js pages with an embedded model.
 for (const t of ["timeline-3d-html", "matchgraph-3d-html"]) {
-  const html = Module.diagram(SAMPLE, t, 0, false);
+  const html = Module.diagram(SAMPLE, t, 0, false, true);
   assert.ok(!html.startsWith("\x01"), `${t} errored: ${html.slice(0, 80)}`);
   assert.ok(html.includes("<!DOCTYPE html>"), `${t} should be an HTML page`);
   assert.ok(html.includes("unpkg.com/three"), `${t} should reference three.js`);
 }
 console.log("OK 3d-html viewers");
+
+// approximate_disjoint_errors: a circuit with PAULI_CHANNEL_2 needs it for the
+// match graph; off should error, on should render.
+const DISJOINT =
+  "R 0 1\nTICK\nPAULI_CHANNEL_2(0.001,0.002,0.003,0.004,0.005,0.006,0.007,0.008,0.009,0.01,0.011,0.012,0.013,0.014,0.15) 0 1\nTICK\nM 0 1\nDETECTOR rec[-1]\nDETECTOR rec[-2]\n";
+assert.ok(
+  Module.diagram(DISJOINT, "matchgraph-svg", 0, false, false).startsWith("\x01" + ERROR_PREFIX),
+  "matchgraph without approx_disjoint should error on PAULI_CHANNEL_2"
+);
+assert.ok(
+  Module.diagram(DISJOINT, "matchgraph-svg", 0, false, true).includes("<svg"),
+  "matchgraph with approx_disjoint should render"
+);
+console.log("OK approximate_disjoint_errors");
 
 console.log("ALL WASM CHECKS PASSED");

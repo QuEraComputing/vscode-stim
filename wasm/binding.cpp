@@ -37,6 +37,7 @@ static void render_to(
     uint64_t tick_start,
     uint64_t tick_num,
     size_t num_rows,
+    double approx_disjoint_threshold,
     std::ostream &out) {
     std::vector<CoordFilter> filters;
     filters.push_back(CoordFilter{});
@@ -58,7 +59,7 @@ static void render_to(
             .write_svg_diagram_to(out, num_rows);
     } else if (type == "matchgraph-svg") {
         DetectorErrorModel dem = ErrorAnalyzer::circuit_to_detector_error_model(
-            circuit, false, true, false, 0, false, false);
+            circuit, false, true, false, approx_disjoint_threshold, false, false);
         dem_match_graph_to_svg_diagram_write_to(dem, out);
     } else if (type == "timeline-3d-html") {
         std::ostringstream gltf;
@@ -69,7 +70,7 @@ static void render_to(
         write_html_viewer_for_gltf_data(gltf.str(), out);
     } else if (type == "matchgraph-3d-html") {
         DetectorErrorModel dem = ErrorAnalyzer::circuit_to_detector_error_model(
-            circuit, false, true, false, 0, false, false);
+            circuit, false, true, false, approx_disjoint_threshold, false, false);
         std::ostringstream gltf;
         dem_match_graph_to_basic_3d_diagram(dem).to_gltf_scene().to_json().write(gltf);
         write_html_viewer_for_gltf_data(gltf.str(), out);
@@ -78,8 +79,15 @@ static void render_to(
     }
 }
 
+// `approx_disjoint` enables stim's approximate_disjoint_errors when building the
+// detector error model for match graphs (threshold 1.0); off uses 0.0.
+static double disjoint_threshold(bool approx_disjoint) {
+    return approx_disjoint ? 1.0 : 0.0;
+}
+
 // A single slice/diagram at one tick.
-static std::string diagram(std::string circuit_text, std::string type, int tick, bool without_noise) {
+static std::string diagram(
+    std::string circuit_text, std::string type, int tick, bool without_noise, bool approx_disjoint) {
     try {
         Circuit circuit{std::string_view(circuit_text)};
         if (without_noise) {
@@ -87,7 +95,7 @@ static std::string diagram(std::string circuit_text, std::string type, int tick,
         }
         uint64_t tick_start = (uint64_t)(tick < 0 ? 0 : tick);
         std::ostringstream out;
-        render_to(circuit, type, tick_start, 1, 0, out);
+        render_to(circuit, type, tick_start, 1, 0, disjoint_threshold(approx_disjoint), out);
         return out.str();
     } catch (const std::exception &e) {
         return ERROR_PREFIX + e.what();
@@ -97,7 +105,8 @@ static std::string diagram(std::string circuit_text, std::string type, int tick,
 }
 
 // The whole circuit's ticks in one diagram, laid out in `rows` rows (0 = auto).
-static std::string diagram_full(std::string circuit_text, std::string type, int rows, bool without_noise) {
+static std::string diagram_full(
+    std::string circuit_text, std::string type, int rows, bool without_noise, bool approx_disjoint) {
     try {
         Circuit circuit{std::string_view(circuit_text)};
         if (without_noise) {
@@ -105,7 +114,7 @@ static std::string diagram_full(std::string circuit_text, std::string type, int 
         }
         size_t num_rows = rows < 0 ? 0 : (size_t)rows;
         std::ostringstream out;
-        render_to(circuit, type, 0, UINT64_MAX, num_rows, out);
+        render_to(circuit, type, 0, UINT64_MAX, num_rows, disjoint_threshold(approx_disjoint), out);
         return out.str();
     } catch (const std::exception &e) {
         return ERROR_PREFIX + e.what();

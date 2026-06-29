@@ -29,8 +29,20 @@ export const TICK_DEPENDENT: ReadonlySet<string> = new Set([
 const ERROR_SENTINEL = "\x01ERROR\x01";
 
 interface StimModule {
-  diagram(text: string, type: string, tick: number, withoutNoise: boolean): string;
-  diagram_full(text: string, type: string, rows: number, withoutNoise: boolean): string;
+  diagram(
+    text: string,
+    type: string,
+    tick: number,
+    withoutNoise: boolean,
+    approxDisjoint: boolean
+  ): string;
+  diagram_full(
+    text: string,
+    type: string,
+    rows: number,
+    withoutNoise: boolean,
+    approxDisjoint: boolean
+  ): string;
   count_ticks(text: string): number;
   gate_data_json(): string;
 }
@@ -62,12 +74,13 @@ export async function renderDiagram(
   circuitText: string,
   type: DiagramType,
   tick: number,
-  withoutNoise = false
+  withoutNoise = false,
+  approxDisjoint = true
 ): Promise<string> {
   const mod = await loadModule();
   let result: string;
   try {
-    result = mod.diagram(circuitText, type, tick, withoutNoise);
+    result = mod.diagram(circuitText, type, tick, withoutNoise, approxDisjoint);
   } catch (e: any) {
     // A wasm trap (e.g. a slice tick on a circuit with no TICKs) poisons the
     // module instance. Drop it so the next render gets a fresh module.
@@ -88,12 +101,13 @@ export async function renderDiagramFull(
   circuitText: string,
   type: DiagramType,
   rows: number,
-  withoutNoise = false
+  withoutNoise = false,
+  approxDisjoint = true
 ): Promise<string> {
   const mod = await loadModule();
   let result: string;
   try {
-    result = mod.diagram_full(circuitText, type, rows, withoutNoise);
+    result = mod.diagram_full(circuitText, type, rows, withoutNoise, approxDisjoint);
   } catch (e: any) {
     modulePromise = undefined;
     throw new Error(`stim failed to render ${type}: ${String(e?.message ?? e)}`);
