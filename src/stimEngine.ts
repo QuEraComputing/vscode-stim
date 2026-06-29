@@ -8,7 +8,16 @@ export const SVG_DIAGRAM_TYPES = [
   "matchgraph-svg",
 ] as const;
 
-export type DiagramType = (typeof SVG_DIAGRAM_TYPES)[number];
+// Interactive 3D viewers; diagram() returns a full HTML page (THREE.js + GLTF).
+export const HTML_DIAGRAM_TYPES = ["timeline-3d-html", "matchgraph-3d-html"] as const;
+
+export type DiagramType =
+  | (typeof SVG_DIAGRAM_TYPES)[number]
+  | (typeof HTML_DIAGRAM_TYPES)[number];
+
+export function isHtmlDiagram(type: string): boolean {
+  return type.endsWith("-html");
+}
 
 export const TICK_DEPENDENT: ReadonlySet<string> = new Set([
   "timeslice-svg",

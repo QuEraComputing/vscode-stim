@@ -10,9 +10,13 @@
 #include "stim/gates/gates.h"
 #include "stim/simulators/error_analyzer.h"
 #include "stim/diagram/coord.h"
+#include "stim/diagram/gltf.h"
+#include "stim/diagram/basic_3d_diagram.h"
 #include "stim/diagram/timeline/timeline_svg_drawer.h"
+#include "stim/diagram/timeline/timeline_3d_drawer.h"
 #include "stim/diagram/detector_slice/detector_slice_set.h"
 #include "stim/diagram/graph/match_graph_svg_drawer.h"
+#include "stim/diagram/graph/match_graph_3d_drawer.h"
 
 using namespace emscripten;
 using namespace stim;
@@ -56,6 +60,19 @@ static void render_to(
         DetectorErrorModel dem = ErrorAnalyzer::circuit_to_detector_error_model(
             circuit, false, true, false, 0, false, false);
         dem_match_graph_to_svg_diagram_write_to(dem, out);
+    } else if (type == "timeline-3d-html") {
+        std::ostringstream gltf;
+        DiagramTimeline3DDrawer::circuit_to_basic_3d_diagram(circuit)
+            .to_gltf_scene()
+            .to_json()
+            .write(gltf);
+        write_html_viewer_for_gltf_data(gltf.str(), out);
+    } else if (type == "matchgraph-3d-html") {
+        DetectorErrorModel dem = ErrorAnalyzer::circuit_to_detector_error_model(
+            circuit, false, true, false, 0, false, false);
+        std::ostringstream gltf;
+        dem_match_graph_to_basic_3d_diagram(dem).to_gltf_scene().to_json().write(gltf);
+        write_html_viewer_for_gltf_data(gltf.str(), out);
     } else {
         throw std::invalid_argument("Unknown diagram type: " + type);
     }

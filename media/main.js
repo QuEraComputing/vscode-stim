@@ -1,6 +1,9 @@
 (function () {
   const vscode = acquireVsCodeApi();
   const seg = document.getElementById("type-seg");
+  const dimSeg = document.getElementById("dim-seg");
+  const dim2d = document.getElementById("dim-2d");
+  const dim3d = document.getElementById("dim-3d");
   const view = document.getElementById("view");
   const tickControl = document.getElementById("tick-control");
   const tickValue = document.getElementById("tick-value");
@@ -15,7 +18,9 @@
   let state = {
     bases: [],
     tickDependentBases: [],
+    dimCapableBases: [],
     base: null,
+    dim: "2d",
     withOps: false,
     withoutNoise: false,
     full: false,
@@ -24,8 +29,12 @@
     rows: 0,
   };
 
+  // 3D types are whole-circuit, so they're never tick-dependent.
   function isTickDependent() {
-    return state.tickDependentBases.includes(state.base);
+    return state.tickDependentBases.includes(state.base) && state.dim !== "3d";
+  }
+  function isDimCapable() {
+    return state.dimCapableBases.includes(state.base);
   }
 
   function setPressed(btn, on) {
@@ -59,6 +68,10 @@
 
   function updateControls() {
     const dependent = isTickDependent();
+    // 2d|3d toggle only for bases with a 3D form (timeline, matchgraph).
+    dimSeg.style.display = isDimCapable() ? "" : "none";
+    dim2d.classList.toggle("active", state.dim === "2d");
+    dim3d.classList.toggle("active", state.dim === "3d");
     // "with ops" only applies to detslice.
     opsBtn.style.display = state.base === "detslice" ? "" : "none";
     setPressed(opsBtn, state.withOps);
@@ -83,6 +96,15 @@
     updateControls();
     vscode.postMessage({ command: "setWithOps", value: state.withOps });
   });
+
+  function setDim(dim) {
+    if (state.dim === dim) return;
+    state.dim = dim;
+    updateControls();
+    vscode.postMessage({ command: "setThreeD", value: dim === "3d" });
+  }
+  dim2d.addEventListener("click", () => setDim("2d"));
+  dim3d.addEventListener("click", () => setDim("3d"));
 
   noiseBtn.addEventListener("click", () => {
     state.withoutNoise = !state.withoutNoise;
@@ -225,6 +247,14 @@
     view.replaceChildren(makeZoomable(svg, { fill: true }));
   }
 
+  // Interactive 3D viewer: stim's self-contained HTML page in an iframe.
+  function showHtml(html) {
+    const frame = document.createElement("iframe");
+    frame.className = "viewer-iframe";
+    frame.srcdoc = html;
+    view.replaceChildren(frame);
+  }
+
   function showError(message) {
     const pre = document.createElement("pre");
     pre.className = "error";
@@ -237,7 +267,9 @@
     if (msg.command === "init") {
       state.bases = msg.bases;
       state.tickDependentBases = msg.tickDependentBases;
+      state.dimCapableBases = msg.dimCapableBases || [];
       state.base = msg.base;
+      state.dim = msg.threeD ? "3d" : "2d";
       state.withOps = msg.withOps;
       state.withoutNoise = msg.withoutNoise;
       state.full = msg.full;
@@ -247,6 +279,8 @@
       rowsInput.value = state.rows > 0 ? String(state.rows) : "";
       renderSegmented();
       updateControls();
+    } else if (msg.command === "html") {
+      showHtml(msg.html);
     } else if (msg.command === "svg") {
       // The host clamps the tick to the valid range; mirror its values.
       if (typeof msg.tick === "number") {

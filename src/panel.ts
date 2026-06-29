@@ -1,5 +1,11 @@
 import * as vscode from "vscode";
-import { renderDiagram, renderDiagramFull, countTicks, DiagramType } from "./stimEngine";
+import {
+  renderDiagram,
+  renderDiagramFull,
+  countTicks,
+  isHtmlDiagram,
+  DiagramType,
+} from "./stimEngine";
 
 // Base diagram families shown in the segmented control. The actual stim
 // diagram-type string is derived from the base plus its sub-toggles.
@@ -15,6 +21,9 @@ const BASE_TYPES: { id: BaseType; label: string; short: string }[] = [
 // Bases that render a per-tick slice (so they get the tick stepper + full mode).
 const TICK_DEPENDENT_BASES: BaseType[] = ["timeslice", "detslice"];
 
+// Bases that also have an interactive 3D form (the 2d|3d toggle).
+const DIM_CAPABLE_BASES: BaseType[] = ["timeline", "matchgraph"];
+
 export class StimPanel {
   public static readonly viewType = "stim.visualizer";
   private static panels = new Map<string, StimPanel>();
@@ -23,6 +32,7 @@ export class StimPanel {
   private withOps = false; // detslice: include operations overlay
   private withoutNoise = false;
   private full = false;
+  private threeD = false; // timeline/matchgraph: interactive 3D viewer
   private tick = 1;
   private rows = 0; // full mode: layout rows (0 = stim auto)
   private disposables: vscode.Disposable[] = [];
@@ -70,18 +80,23 @@ export class StimPanel {
   private currentType(): DiagramType {
     switch (this.base) {
       case "timeline":
-        return "timeline-svg";
+        return this.threeD ? "timeline-3d-html" : "timeline-svg";
       case "timeslice":
         return "timeslice-svg";
       case "detslice":
         return this.withOps ? "detslice-with-ops-svg" : "detslice-svg";
       case "matchgraph":
-        return "matchgraph-svg";
+        return this.threeD ? "matchgraph-3d-html" : "matchgraph-svg";
     }
   }
 
+  private isDimCapable(): boolean {
+    return DIM_CAPABLE_BASES.includes(this.base);
+  }
+
+  // 3D types are whole-circuit, not per-tick.
   private isTickDependent(): boolean {
-    return TICK_DEPENDENT_BASES.includes(this.base);
+    return TICK_DEPENDENT_BASES.includes(this.base) && !this.threeD;
   }
 
   private onMessage(msg: any) {
@@ -90,16 +105,21 @@ export class StimPanel {
         command: "init",
         bases: BASE_TYPES,
         tickDependentBases: TICK_DEPENDENT_BASES,
+        dimCapableBases: DIM_CAPABLE_BASES,
         base: this.base,
         withOps: this.withOps,
         withoutNoise: this.withoutNoise,
         full: this.full,
+        threeD: this.threeD,
         tick: this.tick,
         rows: this.rows,
       });
       this.refresh();
     } else if (msg.command === "setBase") {
       this.base = msg.base;
+      this.refresh();
+    } else if (msg.command === "setThreeD") {
+      this.threeD = !!msg.value;
       this.refresh();
     } else if (msg.command === "setWithOps") {
       this.withOps = !!msg.value;
@@ -145,7 +165,11 @@ export class StimPanel {
         this.tick = Math.min(Math.max(1, this.tick), tickMax);
       }
 
-      if (this.full && dependent) {
+      if (isHtmlDiagram(type)) {
+        // Interactive 3D viewer: a full HTML page rendered in an iframe.
+        const html = await renderDiagram(text, type, 0, withoutNoise);
+        this.panel.webview.postMessage({ command: "html", html, type });
+      } else if (this.full && dependent) {
         // One combined diagram of every tick, laid out in `rows` rows.
         const svg = await renderDiagramFull(text, type, this.rows, withoutNoise);
         this.panel.webview.postMessage({
@@ -183,23 +207,39 @@ export class StimPanel {
 
   private getHtml(): string {
     const webview = this.panel.webview;
-    const nonce = getNonce();
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, "media", "main.js")
     );
     const styleUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, "media", "style.css")
     );
+    // The 3D viewers (timeline-3d / matchgraph-3d) are stim-generated HTML that
+    // loads THREE.js from unpkg and embeds the model as a data: URI, shown in an
+    // iframe. That requires a relaxed CSP (the CDN + inline + data:); the SVG
+    // views don't need it but share this policy.
+    const csp = [
+      "default-src 'none'",
+      `img-src ${webview.cspSource} data: https:`,
+      `style-src ${webview.cspSource} 'unsafe-inline'`,
+      `script-src ${webview.cspSource} 'unsafe-inline' https://unpkg.com`,
+      "connect-src https://unpkg.com data:",
+      `font-src ${webview.cspSource} data:`,
+      "frame-src 'self'",
+    ].join("; ");
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';" />
+<meta http-equiv="Content-Security-Policy" content="${csp};" />
 <link href="${styleUri}" rel="stylesheet" />
 </head>
 <body>
   <div id="toolbar">
     <div id="type-seg" class="segmented"></div>
+    <div id="dim-seg" class="segmented dim-seg">
+      <button id="dim-2d" class="seg-btn" data-dim="2d">2d</button>
+      <button id="dim-3d" class="seg-btn" data-dim="3d">3d</button>
+    </div>
     <button id="toggle-ops" class="switch" aria-pressed="false" title="Overlay operations on the detector slice (detslice-with-ops-svg)">
       <span class="switch-track"><span class="switch-knob"></span></span>
       <span class="switch-label">with ops</span>
@@ -226,15 +266,8 @@ export class StimPanel {
     </div>
   </div>
   <div id="view"></div>
-  <script nonce="${nonce}" src="${scriptUri}"></script>
+  <script src="${scriptUri}"></script>
 </body>
 </html>`;
   }
-}
-
-function getNonce(): string {
-  let text = "";
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  for (let i = 0; i < 32; i++) text += chars.charAt(Math.floor(Math.random() * chars.length));
-  return text;
 }

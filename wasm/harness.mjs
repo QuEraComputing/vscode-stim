@@ -65,4 +65,13 @@ const cx = gates.find((g) => g.name === "CX");
 assert.ok(cx.help.length > 0 && typeof cx.category === "string", "gate entries need help/category");
 console.log(`OK gate_data_json (${gates.length} gates)`);
 
+// 3D HTML viewers: self-contained THREE.js pages with an embedded model.
+for (const t of ["timeline-3d-html", "matchgraph-3d-html"]) {
+  const html = Module.diagram(SAMPLE, t, 0, false);
+  assert.ok(!html.startsWith("\x01"), `${t} errored: ${html.slice(0, 80)}`);
+  assert.ok(html.includes("<!DOCTYPE html>"), `${t} should be an HTML page`);
+  assert.ok(html.includes("unpkg.com/three"), `${t} should reference three.js`);
+}
+console.log("OK 3d-html viewers");
+
 console.log("ALL WASM CHECKS PASSED");

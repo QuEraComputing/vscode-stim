@@ -186,6 +186,15 @@ body {
   overflow: auto;
 }
 
+/* Interactive 3D viewer fills the panel area below the toolbar. */
+.viewer-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #ffffff;
+  display: block;
+}
+
 /* Zoomable SVG container: scroll to pan, Ctrl/Cmd + wheel (or pinch) to zoom.
    Kept white because stim SVGs are designed for a white background. */
 .zoom-wrap {
