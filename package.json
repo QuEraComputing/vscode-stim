@@ -4,6 +4,7 @@
   "description": "Syntax highlighting and circuit visualization for stim files",
   "version": "0.0.1",
   "publisher": "local",
+  "icon": "icon.png",
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Programming Languages", "Visualization"],
   "main": "./dist/extension.js",

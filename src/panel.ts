@@ -43,6 +43,7 @@ export class StimPanel {
         localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, "media")],
       }
     );
+    panel.iconPath = vscode.Uri.joinPath(context.extensionUri, "media", "stim-logo.svg");
     StimPanel.panels.set(key, new StimPanel(panel, context, doc));
   }
 
