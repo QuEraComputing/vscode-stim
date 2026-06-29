@@ -117,6 +117,9 @@ export class StimPanel {
     const text = this.doc.getText();
     const type = this.currentType();
     const dependent = this.isTickDependent();
+    // The match graph is built from the circuit's noise, so always render it
+    // with noise even if the (hidden) "without noise" toggle was left on.
+    const withoutNoise = this.base === "matchgraph" ? false : this.withoutNoise;
     try {
       // Slice diagrams index by tick. Clamp the requested tick to the valid
       // range [1, count_ticks]; out-of-range ticks make stim divide by zero.
@@ -132,9 +135,9 @@ export class StimPanel {
       }
 
       if (this.full && dependent) {
-        await this.refreshFull(text, type, tickMax);
+        await this.refreshFull(text, type, tickMax, withoutNoise);
       } else {
-        const svg = await renderDiagram(text, type, this.tick, this.withoutNoise);
+        const svg = await renderDiagram(text, type, this.tick, withoutNoise);
         this.panel.webview.postMessage({
           command: "svg",
           svg,
@@ -154,11 +157,16 @@ export class StimPanel {
 
   // Full mode: render one slice per tick (1..count_ticks), stacked in the
   // webview. Ticks that fail to render for this diagram type are skipped.
-  private async refreshFull(text: string, type: DiagramType, n: number) {
+  private async refreshFull(
+    text: string,
+    type: DiagramType,
+    n: number,
+    withoutNoise: boolean
+  ) {
     const items: { tick: number; svg: string }[] = [];
     for (let t = 1; t <= n; t++) {
       try {
-        const svg = await renderDiagram(text, type, t, this.withoutNoise);
+        const svg = await renderDiagram(text, type, t, withoutNoise);
         items.push({ tick: t, svg });
       } catch {
         // Skip ticks that cannot be rendered for this diagram type.
