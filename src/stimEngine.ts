@@ -49,6 +49,7 @@ interface StimModule {
   circuit_stats_json(text: string): string;
   dem_diagram(text: string, type: string): string;
   dem_stats_json(text: string): string;
+  circuit_dem_stats_json(text: string, approxDisjoint: boolean, decompose: boolean): string;
   gate_data_json(): string;
 }
 
@@ -59,6 +60,9 @@ export interface DemStats {
   detectors: number;
   observables: number;
   errors: number;
+  // Weight of the shortest graphlike undetectable logical error (graphlike code
+  // distance), or -1 if it cannot be computed.
+  shortestGraphlikeError: number;
   error?: string;
 }
 
@@ -188,6 +192,23 @@ export async function getDemStats(demText: string): Promise<DemStats> {
   } catch (e: any) {
     modulePromise = undefined;
     throw new Error(`stim failed to read DEM stats: ${String(e?.message ?? e)}`);
+  }
+}
+
+// DEM stats derived from a circuit (same build options as the match graph).
+export async function getCircuitDemStats(
+  circuitText: string,
+  approxDisjoint: boolean,
+  decompose: boolean
+): Promise<DemStats> {
+  const mod = await loadModule();
+  try {
+    return JSON.parse(
+      mod.circuit_dem_stats_json(circuitText, approxDisjoint, decompose)
+    ) as DemStats;
+  } catch (e: any) {
+    modulePromise = undefined;
+    throw new Error(`stim failed to read circuit DEM stats: ${String(e?.message ?? e)}`);
   }
 }
 

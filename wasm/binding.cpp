@@ -8,6 +8,7 @@
 #include "stim/circuit/circuit.h"
 #include "stim/dem/detector_error_model.h"
 #include "stim/gates/gates.h"
+#include "stim/search/graphlike/algo.h"
 #include "stim/simulators/error_analyzer.h"
 #include "stim/diagram/coord.h"
 #include "stim/diagram/gltf.h"
@@ -172,21 +173,56 @@ static std::string dem_diagram(std::string dem_text, std::string type) {
     }
 }
 
-// Summary counts for a detector error model, or {"error": "..."} if unparsable.
+// Summary counts for a detector error model, including the shortest graphlike
+// undetectable logical error (the graphlike code distance), or -1 if it cannot
+// be computed (e.g. no logical observable / no such error).
+static std::string dem_stats_to_json(const DetectorErrorModel &dem) {
+    long long shortest = -1;
+    try {
+        DetectorErrorModel e =
+            stim::shortest_graphlike_undetectable_logical_error(dem, true);
+        shortest = (long long)e.count_errors();
+    } catch (...) {
+        shortest = -1;
+    }
+    std::string out = "{";
+    out += "\"detectors\":" + std::to_string((uint64_t)dem.count_detectors());
+    out += ",\"observables\":" + std::to_string((uint64_t)dem.count_observables());
+    out += ",\"errors\":" + std::to_string((uint64_t)dem.count_errors());
+    out += ",\"shortestGraphlikeError\":" + std::to_string(shortest);
+    out += "}";
+    return out;
+}
+
+static std::string error_json(const char *what) {
+    std::string out = "{\"error\":\"";
+    json_escape_to(what, out);
+    out += "\"}";
+    return out;
+}
+
+// Stats for a detector error model given as .dem text.
 static std::string dem_stats_json(std::string dem_text) {
     try {
         DetectorErrorModel dem{std::string_view(dem_text)};
-        std::string out = "{";
-        out += "\"detectors\":" + std::to_string((uint64_t)dem.count_detectors());
-        out += ",\"observables\":" + std::to_string((uint64_t)dem.count_observables());
-        out += ",\"errors\":" + std::to_string((uint64_t)dem.count_errors());
-        out += "}";
-        return out;
+        return dem_stats_to_json(dem);
     } catch (const std::exception &e) {
-        std::string out = "{\"error\":\"";
-        json_escape_to(e.what(), out);
-        out += "\"}";
-        return out;
+        return error_json(e.what());
+    }
+}
+
+// DEM stats for a circuit: build its detector error model (honouring the same
+// options as the match graph) and report its counts. Powers the extra DEM rows
+// shown when the match graph is selected for a circuit.
+static std::string circuit_dem_stats_json(
+    std::string circuit_text, bool approx_disjoint, bool decompose_errors) {
+    try {
+        Circuit c{std::string_view(circuit_text)};
+        DetectorErrorModel dem = ErrorAnalyzer::circuit_to_detector_error_model(
+            c, decompose_errors, true, false, disjoint_threshold(approx_disjoint), false, false);
+        return dem_stats_to_json(dem);
+    } catch (const std::exception &e) {
+        return error_json(e.what());
     }
 }
 
@@ -258,5 +294,6 @@ EMSCRIPTEN_BINDINGS(stim_diagram) {
     function("circuit_stats_json", &circuit_stats_json);
     function("dem_diagram", &dem_diagram);
     function("dem_stats_json", &dem_stats_json);
+    function("circuit_dem_stats_json", &circuit_dem_stats_json);
     function("gate_data_json", &gate_data_json);
 }

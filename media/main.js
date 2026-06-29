@@ -363,21 +363,24 @@
     view.replaceChildren(pre);
   }
 
-  // Fill the info tooltip from a title and label/value rows (null = parse error).
+  // Fill the info tooltip from titled sections (null sections = parse error).
   function renderStats(msg) {
-    const title = msg.title || "Info";
-    if (!msg.rows) {
+    if (!msg.sections) {
       infoTip.innerHTML = '<div class="info-error">Cannot parse</div>';
       return;
     }
-    infoTip.innerHTML =
-      `<div class="info-title">${title}</div>` +
-      msg.rows
-        .map(
-          ([k, v]) =>
-            `<div class="info-row"><span class="info-k">${k}</span><span class="info-v">${v}</span></div>`
-        )
-        .join("");
+    infoTip.innerHTML = msg.sections
+      .map(
+        (sec) =>
+          `<div class="info-title">${sec.title}</div>` +
+          sec.rows
+            .map(
+              ([k, v]) =>
+                `<div class="info-row"><span class="info-k">${k}</span><span class="info-v">${v}</span></div>`
+            )
+            .join("")
+      )
+      .join("");
   }
 
   // When the panel finishes resizing, re-render the SVG so it re-fits the new

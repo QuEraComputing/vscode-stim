@@ -99,6 +99,13 @@ const demStats = JSON.parse(Module.dem_stats_json(DEM));
 assert.strictEqual(demStats.detectors, 3, "expected 3 detectors");
 assert.strictEqual(demStats.observables, 1, "expected 1 observable");
 assert.strictEqual(demStats.errors, 2, "expected 2 errors");
+assert.strictEqual(typeof demStats.shortestGraphlikeError, "number", "expected a distance");
 console.log("OK dem support");
+
+// circuit_dem_stats_json: DEM stats derived from a circuit, including distance.
+const cds = JSON.parse(Module.circuit_dem_stats_json(SAMPLE, true, false));
+assert.ok(typeof cds.errors === "number" && typeof cds.shortestGraphlikeError === "number",
+  "circuit dem stats need errors + distance");
+console.log("OK circuit_dem_stats_json");
 
 console.log("ALL WASM CHECKS PASSED");

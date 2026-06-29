@@ -10,6 +10,7 @@ import {
   countTicks,
   getCircuitStats,
   getDemStats,
+  getCircuitDemStats,
   isHtmlDiagram,
   DiagramType,
   DemDiagramType,
@@ -31,6 +32,12 @@ const TICK_DEPENDENT_BASES: BaseType[] = ["timeslice", "detslice"];
 
 // Bases that also have an interactive 3D form (the 2d|3d toggle).
 const DIM_CAPABLE_BASES: BaseType[] = ["timeline", "matchgraph"];
+
+// A titled group of label/value rows in the info tooltip.
+interface StatSection {
+  title: string;
+  rows: [string, string | number][];
+}
 
 // Persisted toolbar selections, restored when a new panel opens.
 const STATE_KEY = "stim.viewState";
@@ -322,26 +329,56 @@ export class StimPanel {
     }
   }
 
-  private postStats(title: string, rows: [string, number][] | null) {
-    this.panel.webview.postMessage({ command: "stats", title, rows });
+  // Post titled sections to the info tooltip (null = parse error).
+  private postStats(sections: StatSection[] | null) {
+    this.panel.webview.postMessage({ command: "stats", sections });
   }
 
-  // Send circuit summary counts to the webview's info tooltip.
+  // Format the shortest graphlike error (graphlike distance); -1 means stim
+  // could not compute one (e.g. no logical observable).
+  private static distanceValue(d: number): string | number {
+    return d >= 0 ? d : "n/a";
+  }
+
+  // Send circuit summary counts to the webview's info tooltip. When the match
+  // graph is selected, add a "Detector Error Model" section with its stats.
   private async sendStats(text: string) {
     try {
       const s = await getCircuitStats(text);
       if (s.error) {
-        this.postStats("Circuit", null);
+        this.postStats(null);
         return;
       }
-      this.postStats("Circuit", [
-        ["Qubits", s.qubits],
-        ["Measurements", s.measurements],
-        ["Detectors", s.detectors],
-        ["Observables", s.observables],
-        ["Ticks", s.ticks],
-        ["Sweep bits", s.sweepBits],
-      ]);
+      const sections: StatSection[] = [
+        {
+          title: "Circuit",
+          rows: [
+            ["Qubits", s.qubits],
+            ["Measurements", s.measurements],
+            ["Detectors", s.detectors],
+            ["Observables", s.observables],
+            ["Ticks", s.ticks],
+            ["Sweep bits", s.sweepBits],
+          ],
+        },
+      ];
+      if (this.base === "matchgraph") {
+        try {
+          const d = await getCircuitDemStats(text, this.approxDisjoint, this.decomposeErrors);
+          if (!d.error) {
+            sections.push({
+              title: "Detector Error Model",
+              rows: [
+                ["Errors", d.errors],
+                ["Shortest graphlike error", StimPanel.distanceValue(d.shortestGraphlikeError)],
+              ],
+            });
+          }
+        } catch {
+          // Leave the circuit section as-is if the DEM build fails.
+        }
+      }
+      this.postStats(sections);
     } catch {
       // Ignore; the tooltip just keeps its previous content.
     }
@@ -352,13 +389,19 @@ export class StimPanel {
     try {
       const s = await getDemStats(text);
       if (s.error) {
-        this.postStats("Detector error model", null);
+        this.postStats(null);
         return;
       }
-      this.postStats("Detector error model", [
-        ["Detectors", s.detectors],
-        ["Observables", s.observables],
-        ["Errors", s.errors],
+      this.postStats([
+        {
+          title: "Detector Error Model",
+          rows: [
+            ["Detectors", s.detectors],
+            ["Observables", s.observables],
+            ["Errors", s.errors],
+            ["Shortest graphlike error", StimPanel.distanceValue(s.shortestGraphlikeError)],
+          ],
+        },
       ]);
     } catch {
       // Ignore; the tooltip just keeps its previous content.
