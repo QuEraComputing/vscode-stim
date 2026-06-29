@@ -167,16 +167,27 @@ body {
   cursor: default;
 }
 .step-value {
-  min-width: 26px;
-  padding: 3px 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 44px;
+  padding: 3px 4px;
   text-align: center;
+  font: inherit;
   font-variant-numeric: tabular-nums;
+  color: var(--vscode-foreground);
+  border: none;
   border-left: 1px solid var(--vscode-panel-border);
   border-right: 1px solid var(--vscode-panel-border);
   background: var(--vscode-editor-background);
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.step-value:focus {
+  outline: none;
+  background: var(--vscode-input-background);
+}
+.step-value::-webkit-inner-spin-button,
+.step-value::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 #view {

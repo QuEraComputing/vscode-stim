@@ -309,7 +309,8 @@ export class StimPanel {
     <div id="tick-control">
       <div class="stepper">
         <button id="tick-prev" class="step" title="Previous layer (← or q; shift+q = −5, home = first)">◀</button>
-        <span id="tick-value" class="step-value">1</span>
+        <input id="tick-value" class="step-value" type="number" min="1" step="1" value="1"
+               aria-label="Current layer" title="Layer number — type to jump (clamped to range)" />
         <button id="tick-next" class="step" title="Next layer (→ or e; shift+e = +5, end = last)">▶</button>
       </div>
     </div>

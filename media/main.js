@@ -131,14 +131,33 @@
   tickPrev.addEventListener("click", () => setTick(state.tick - 1));
   tickNext.addEventListener("click", () => setTick(state.tick + 1));
   function setTick(t) {
-    let next = Math.max(1, t);
+    let next = Math.floor(t);
+    if (!Number.isFinite(next) || next < 1) next = 1;
     if (state.tickMax > 0) next = Math.min(next, state.tickMax);
-    if (next === state.tick) return;
+    const changed = next !== state.tick;
     state.tick = next;
-    tickValue.textContent = String(state.tick);
+    tickValue.value = String(next); // mirror the clamped value back into the box
     updateTickButtons();
-    vscode.postMessage({ command: "setTick", tick: state.tick });
+    if (changed) vscode.postMessage({ command: "setTick", tick: next });
   }
+
+  // Typing a layer number jumps to it; out-of-range values clamp (too large ->
+  // last, negative/zero -> first) via setTick.
+  function commitTickInput() {
+    const v = parseInt(tickValue.value, 10);
+    if (Number.isNaN(v)) {
+      tickValue.value = String(state.tick);
+      return;
+    }
+    setTick(v);
+  }
+  tickValue.addEventListener("change", commitTickInput);
+  tickValue.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      commitTickInput();
+      tickValue.blur();
+    }
+  });
 
   function updateTickButtons() {
     tickPrev.disabled = state.tick <= 1;
@@ -310,17 +329,20 @@
       state.full = msg.full;
       state.tick = msg.tick;
       state.rows = msg.rows || 0;
-      tickValue.textContent = String(state.tick);
+      tickValue.value = String(state.tick);
       rowsInput.value = state.rows > 0 ? String(state.rows) : "";
       renderSegmented();
       updateControls();
     } else if (msg.command === "html") {
       showHtml(msg.html);
     } else if (msg.command === "svg") {
-      // The host clamps the tick to the valid range; mirror its values.
+      // The host clamps the tick to the valid range; mirror its values (unless
+      // the user is mid-edit in the box).
       if (typeof msg.tick === "number") {
         state.tick = msg.tick;
-        tickValue.textContent = String(state.tick);
+        if (document.activeElement !== tickValue) {
+          tickValue.value = String(state.tick);
+        }
       }
       if (typeof msg.tickMax === "number") state.tickMax = msg.tickMax;
       updateTickButtons();
