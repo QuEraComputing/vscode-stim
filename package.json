@@ -6,6 +6,14 @@
   "publisher": "local",
   "author": "Rafael Haenel",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CHANGEME/stim-vscode"
+  },
+  "homepage": "https://github.com/CHANGEME/stim-vscode#readme",
+  "bugs": {
+    "url": "https://github.com/CHANGEME/stim-vscode/issues"
+  },
   "icon": "icon.png",
   "engines": {
     "vscode": "^1.85.0"
