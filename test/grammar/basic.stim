@@ -1,0 +1,22 @@
+# SYNTAX TEST "source.stim" "stim basic"
+
+# comment line
+# <- comment.line.number-sign.stim
+
+H 0 1
+# <- support.function.stim
+#   ^ constant.numeric.stim
+
+X_ERROR(0.01) 0
+# <- support.function.stim
+#       ^^^^ constant.numeric.stim
+
+DETECTOR rec[-1]
+# <- keyword.control.stim
+#        ^^^^^^^ variable.other.stim
+
+REPEAT 3 {
+# <- keyword.control.stim
+#      ^ constant.numeric.stim
+  M 0
+}

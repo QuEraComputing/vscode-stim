@@ -1,0 +1,68 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Stim",
+  "scopeName": "source.stim",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#repeat-block" },
+    { "include": "#control" },
+    { "include": "#instruction" }
+  ],
+  "repository": {
+    "comment": {
+      "match": "#.*$",
+      "name": "comment.line.number-sign.stim"
+    },
+    "repeat-block": {
+      "begin": "\\b(REPEAT)\\s+(\\d+)\\s*(\\{)",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.stim" },
+        "2": { "name": "constant.numeric.stim" },
+        "3": { "name": "punctuation.bracket.stim" }
+      },
+      "end": "(\\})",
+      "endCaptures": { "1": { "name": "punctuation.bracket.stim" } },
+      "patterns": [{ "include": "$self" }]
+    },
+    "control": {
+      "begin": "\\b(REPEAT|DETECTOR|OBSERVABLE_INCLUDE|QUBIT_COORDS|SHIFT_COORDS|TICK|MPAD)\\b",
+      "beginCaptures": { "1": { "name": "keyword.control.stim" } },
+      "end": "(?=#)|$",
+      "patterns": [
+        { "include": "#args" },
+        { "include": "#targets" },
+        { "include": "#tag" }
+      ]
+    },
+    "instruction": {
+      "begin": "\\b([A-Z][A-Z0-9_]*)\\b",
+      "beginCaptures": { "1": { "name": "support.function.stim" } },
+      "end": "(?=#)|$",
+      "patterns": [
+        { "include": "#args" },
+        { "include": "#targets" },
+        { "include": "#tag" }
+      ]
+    },
+    "args": {
+      "begin": "\\(",
+      "beginCaptures": { "0": { "name": "punctuation.bracket.stim" } },
+      "end": "\\)",
+      "endCaptures": { "0": { "name": "punctuation.bracket.stim" } },
+      "patterns": [
+        { "match": "-?\\d+(?:\\.\\d*)?(?:[eE][+-]?\\d+)?", "name": "constant.numeric.stim" }
+      ]
+    },
+    "tag": { "match": "\\[[^\\]]*\\]", "name": "string.other.stim" },
+    "targets": {
+      "patterns": [
+        { "match": "rec\\[-\\d+\\]", "name": "variable.other.stim" },
+        { "match": "sweep\\[\\d+\\]", "name": "variable.other.stim" },
+        { "match": "!?[XYZ]\\d+", "name": "storage.type.pauli.stim" },
+        { "match": "\\*", "name": "keyword.operator.stim" },
+        { "match": "!", "name": "keyword.operator.stim" },
+        { "match": "-?\\d+(?:\\.\\d*)?", "name": "constant.numeric.stim" }
+      ]
+    }
+  }
+}
