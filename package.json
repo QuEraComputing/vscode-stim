@@ -46,7 +46,8 @@
     "build:wasm": "bash wasm/build-wasm.sh",
     "test:wasm": "node wasm/harness.mjs",
     "test:grammar": "vscode-tmgrammar-test \"test/grammar/*.stim\"",
-    "test:engine": "node --test test/engine.test.mjs",
+    "build:test": "tsc src/stimEngine.ts --outDir dist-test --module nodenext --target ES2021 --moduleResolution nodenext --skipLibCheck",
+    "test:engine": "npm run build:test && node --test test/engine.test.mjs",
     "vscode:prepublish": "node esbuild.js --production"
   },
   "devDependencies": {
