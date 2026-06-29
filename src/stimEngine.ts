@@ -20,7 +20,8 @@ export const TICK_DEPENDENT: ReadonlySet<string> = new Set([
 const ERROR_SENTINEL = "\x01ERROR\x01";
 
 interface StimModule {
-  diagram(text: string, type: string, tick: number): string;
+  diagram(text: string, type: string, tick: number, withoutNoise: boolean): string;
+  count_ticks(text: string): number;
 }
 
 let modulePromise: Promise<StimModule> | undefined;
@@ -42,12 +43,13 @@ async function loadModule(): Promise<StimModule> {
 export async function renderDiagram(
   circuitText: string,
   type: DiagramType,
-  tick: number
+  tick: number,
+  withoutNoise = false
 ): Promise<string> {
   const mod = await loadModule();
   let result: string;
   try {
-    result = mod.diagram(circuitText, type, tick);
+    result = mod.diagram(circuitText, type, tick, withoutNoise);
   } catch (e: any) {
     // A wasm trap (e.g. a slice tick on a circuit with no TICKs) poisons the
     // module instance. Drop it so the next render gets a fresh module.
@@ -60,4 +62,16 @@ export async function renderDiagram(
     throw new Error(result.slice(ERROR_SENTINEL.length));
   }
   return result;
+}
+
+// Number of TICK instructions in the circuit (-1 if it cannot be parsed).
+// Drives "full mode", which renders one slice per tick.
+export async function countTicks(circuitText: string): Promise<number> {
+  const mod = await loadModule();
+  try {
+    return mod.count_ticks(circuitText);
+  } catch (e: any) {
+    modulePromise = undefined;
+    throw new Error(`stim failed to count ticks: ${String(e?.message ?? e)}`);
+  }
 }

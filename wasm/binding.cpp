@@ -21,9 +21,12 @@ using namespace stim_draw_internal;
 // because C++ hex escapes greedily consume every following hex digit.
 static const std::string ERROR_PREFIX = "\x01" "ERROR" "\x01";
 
-static std::string diagram(std::string circuit_text, std::string type, int tick) {
+static std::string diagram(std::string circuit_text, std::string type, int tick, bool without_noise) {
     try {
         Circuit circuit{std::string_view(circuit_text)};
+        if (without_noise) {
+            circuit = circuit.without_noise();
+        }
         std::vector<CoordFilter> filters;
         filters.push_back(CoordFilter{});
         SpanRef<const CoordFilter> coord_filter(filters);
@@ -61,6 +64,18 @@ static std::string diagram(std::string circuit_text, std::string type, int tick)
     }
 }
 
+// Returns the number of TICK instructions in the circuit, or -1 if the
+// circuit text cannot be parsed. Used to drive "full mode" (one slice per tick).
+static int count_ticks(std::string circuit_text) {
+    try {
+        Circuit circuit{std::string_view(circuit_text)};
+        return (int)circuit.count_ticks();
+    } catch (...) {
+        return -1;
+    }
+}
+
 EMSCRIPTEN_BINDINGS(stim_diagram) {
     function("diagram", &diagram);
+    function("count_ticks", &count_ticks);
 }
