@@ -1,0 +1,36 @@
+body {
+  margin: 0;
+  font-family: var(--vscode-font-family);
+  color: var(--vscode-foreground);
+  background: var(--vscode-editor-background);
+}
+#toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 8px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  position: sticky;
+  top: 0;
+  background: var(--vscode-editor-background);
+}
+button {
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border: none;
+  padding: 4px 10px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+button.active {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+#tick-control { display: none; align-items: center; gap: 4px; margin-left: 8px; }
+#tick-control.visible { display: flex; }
+#tick-value { width: 48px; text-align: center; }
+#status { margin-left: auto; opacity: 0.7; font-size: 0.85em; }
+#view { padding: 12px; overflow: auto; }
+#view svg { max-width: 100%; height: auto; }
+.error { color: var(--vscode-errorForeground); white-space: pre-wrap; font-family: var(--vscode-editor-font-family); }
