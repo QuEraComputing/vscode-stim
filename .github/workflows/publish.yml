@@ -1,0 +1,51 @@
+name: Publish
+
+# Publishes the extension when a v* tag is pushed (e.g. `git tag v0.1.0 && git push --tags`).
+# Requires repository secrets:
+#   VSCE_PAT  - VS Code Marketplace personal access token (and a real `publisher` in package.json)
+#   OVSX_PAT  - Open VSX token (optional; the Open VSX step is non-fatal if missing)
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write # to attach the .vsix to the GitHub release
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build and test
+        run: |
+          npm run build
+          npm run test:engine
+
+      - name: Package
+        run: npx @vscode/vsce package -o stim-vscode.vsix
+
+      - name: Publish to VS Code Marketplace
+        run: npx @vscode/vsce publish --packagePath stim-vscode.vsix
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+      - name: Publish to Open VSX
+        run: npx ovsx publish stim-vscode.vsix -p "$OVSX_PAT"
+        continue-on-error: true # non-fatal: skip cleanly if OVSX_PAT isn't set
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+
+      - name: Attach .vsix to GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: stim-vscode.vsix
