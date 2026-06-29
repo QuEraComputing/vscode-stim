@@ -1,0 +1,53 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Stim DEM",
+  "scopeName": "source.dem",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#repeat-block" },
+    { "include": "#instruction" }
+  ],
+  "repository": {
+    "comment": {
+      "match": "#.*$",
+      "name": "comment.line.number-sign.dem"
+    },
+    "repeat-block": {
+      "begin": "\\b(repeat)\\s+(\\d+)\\s*(\\{)",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.dem" },
+        "2": { "name": "constant.numeric.dem" },
+        "3": { "name": "punctuation.bracket.dem" }
+      },
+      "end": "(\\})",
+      "endCaptures": { "1": { "name": "punctuation.bracket.dem" } },
+      "patterns": [{ "include": "$self" }]
+    },
+    "instruction": {
+      "begin": "\\b(error|detector|logical_observable|shift_detectors|repeat)\\b",
+      "beginCaptures": { "1": { "name": "keyword.control.dem" } },
+      "end": "(?=#)|$",
+      "patterns": [
+        { "include": "#args" },
+        { "include": "#targets" }
+      ]
+    },
+    "args": {
+      "begin": "\\(",
+      "beginCaptures": { "0": { "name": "punctuation.bracket.dem" } },
+      "end": "\\)",
+      "endCaptures": { "0": { "name": "punctuation.bracket.dem" } },
+      "patterns": [
+        { "match": "-?\\d+(?:\\.\\d*)?(?:[eE][+-]?\\d+)?", "name": "constant.numeric.dem" }
+      ]
+    },
+    "targets": {
+      "patterns": [
+        { "match": "D\\d+", "name": "variable.other.detector.dem" },
+        { "match": "L\\d+", "name": "entity.name.tag.observable.dem" },
+        { "match": "\\^", "name": "keyword.operator.separator.dem" },
+        { "match": "-?\\d+(?:\\.\\d*)?", "name": "constant.numeric.dem" }
+      ]
+    }
+  }
+}

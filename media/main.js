@@ -19,6 +19,7 @@
   const infoTip = document.getElementById("info-tip");
 
   let state = {
+    kind: "circuit",
     bases: [],
     tickDependentBases: [],
     dimCapableBases: [],
@@ -89,12 +90,13 @@
       state.base !== "matchgraph" && !(state.base === "detslice" && !state.withOps);
     noiseBtn.style.display = noiseVisible ? "" : "none";
     setPressed(noiseBtn, state.withoutNoise);
-    // "approx. disjoint errors" and "decompose errors" only affect the match
-    // graph's error model.
-    const isMatch = state.base === "matchgraph";
-    approxBtn.style.display = isMatch ? "" : "none";
+    // "approx. disjoint errors" and "decompose errors" are circuit->DEM build
+    // options, so they only apply to the match graph of a circuit (not a .dem,
+    // whose error structure is already fixed).
+    const matchFromCircuit = state.base === "matchgraph" && state.kind === "circuit";
+    approxBtn.style.display = matchFromCircuit ? "" : "none";
     setPressed(approxBtn, state.approxDisjoint);
-    decomposeBtn.style.display = isMatch ? "" : "none";
+    decomposeBtn.style.display = matchFromCircuit ? "" : "none";
     setPressed(decomposeBtn, state.decomposeErrors);
     // Full mode only applies to slice (tick-dependent) types.
     fullBtn.style.display = dependent ? "" : "none";
@@ -361,24 +363,16 @@
     view.replaceChildren(pre);
   }
 
-  // Fill the info tooltip with the circuit's summary counts.
-  function renderStats(stats) {
-    if (!stats) return;
-    if (stats.error) {
-      infoTip.innerHTML = '<div class="info-error">Cannot parse circuit</div>';
+  // Fill the info tooltip from a title and label/value rows (null = parse error).
+  function renderStats(msg) {
+    const title = msg.title || "Info";
+    if (!msg.rows) {
+      infoTip.innerHTML = '<div class="info-error">Cannot parse</div>';
       return;
     }
-    const rows = [
-      ["Qubits", stats.qubits],
-      ["Measurements", stats.measurements],
-      ["Detectors", stats.detectors],
-      ["Observables", stats.observables],
-      ["Ticks", stats.ticks],
-      ["Sweep bits", stats.sweepBits],
-    ];
     infoTip.innerHTML =
-      '<div class="info-title">Circuit</div>' +
-      rows
+      `<div class="info-title">${title}</div>` +
+      msg.rows
         .map(
           ([k, v]) =>
             `<div class="info-row"><span class="info-k">${k}</span><span class="info-v">${v}</span></div>`
@@ -402,6 +396,7 @@
   window.addEventListener("message", (event) => {
     const msg = event.data;
     if (msg.command === "init") {
+      state.kind = msg.kind || "circuit";
       state.bases = msg.bases;
       state.tickDependentBases = msg.tickDependentBases;
       state.dimCapableBases = msg.dimCapableBases || [];
@@ -435,7 +430,7 @@
     } else if (msg.command === "error") {
       showError(msg.message);
     } else if (msg.command === "stats") {
-      renderStats(msg.stats);
+      renderStats(msg);
     }
   });
 

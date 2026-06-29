@@ -148,6 +148,48 @@ static void json_escape_to(std::string_view s, std::string &out) {
     }
 }
 
+// Match-graph diagram drawn directly from a detector error model (.dem). The
+// circuit-only options (noise, approximate_disjoint, decompose) don't apply
+// here; the DEM already fixes the error structure.
+static std::string dem_diagram(std::string dem_text, std::string type) {
+    try {
+        DetectorErrorModel dem{std::string_view(dem_text)};
+        std::ostringstream out;
+        if (type == "matchgraph-svg") {
+            dem_match_graph_to_svg_diagram_write_to(dem, out);
+        } else if (type == "matchgraph-3d-html") {
+            std::ostringstream gltf;
+            dem_match_graph_to_basic_3d_diagram(dem).to_gltf_scene().to_json().write(gltf);
+            write_html_viewer_for_gltf_data(gltf.str(), out);
+        } else {
+            throw std::invalid_argument("Unsupported DEM diagram type: " + type);
+        }
+        return out.str();
+    } catch (const std::exception &e) {
+        return ERROR_PREFIX + e.what();
+    } catch (...) {
+        return ERROR_PREFIX + std::string("unknown error generating diagram");
+    }
+}
+
+// Summary counts for a detector error model, or {"error": "..."} if unparsable.
+static std::string dem_stats_json(std::string dem_text) {
+    try {
+        DetectorErrorModel dem{std::string_view(dem_text)};
+        std::string out = "{";
+        out += "\"detectors\":" + std::to_string((uint64_t)dem.count_detectors());
+        out += ",\"observables\":" + std::to_string((uint64_t)dem.count_observables());
+        out += ",\"errors\":" + std::to_string((uint64_t)dem.count_errors());
+        out += "}";
+        return out;
+    } catch (const std::exception &e) {
+        std::string out = "{\"error\":\"";
+        json_escape_to(e.what(), out);
+        out += "\"}";
+        return out;
+    }
+}
+
 // Returns stim's full gate/annotation table as JSON: an array of
 // {name, category, args, help}. Drives editor autocomplete so the completion
 // list always matches the compiled stim version.
@@ -214,5 +256,7 @@ EMSCRIPTEN_BINDINGS(stim_diagram) {
     function("diagram_full", &diagram_full);
     function("count_ticks", &count_ticks);
     function("circuit_stats_json", &circuit_stats_json);
+    function("dem_diagram", &dem_diagram);
+    function("dem_stats_json", &dem_stats_json);
     function("gate_data_json", &gate_data_json);
 }

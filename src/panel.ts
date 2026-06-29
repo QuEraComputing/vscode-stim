@@ -6,10 +6,13 @@ import { execFile } from "child_process";
 import {
   renderDiagram,
   renderDiagramFull,
+  renderDemDiagram,
   countTicks,
   getCircuitStats,
+  getDemStats,
   isHtmlDiagram,
   DiagramType,
+  DemDiagramType,
 } from "./stimEngine";
 
 // Base diagram families shown in the segmented control. The actual stim
@@ -47,6 +50,8 @@ export class StimPanel {
   public static readonly viewType = "stim.visualizer";
   private static panels = new Map<string, StimPanel>();
 
+  // "dem" documents are detector error models: only the match graph applies.
+  private readonly kind: "circuit" | "dem";
   private base: BaseType = "timeline";
   private withOps = false; // detslice: include operations overlay
   private withoutNoise = false;
@@ -88,7 +93,11 @@ export class StimPanel {
     private readonly context: vscode.ExtensionContext,
     private readonly doc: vscode.TextDocument
   ) {
+    this.kind = doc.languageId === "dem" ? "dem" : "circuit";
     this.loadState();
+    if (this.kind === "dem") {
+      this.base = "matchgraph"; // the only diagram a DEM supports
+    }
     this.panel.webview.html = this.getHtml();
     this.panel.webview.onDidReceiveMessage(
       (msg) => this.onMessage(msg),
@@ -165,10 +174,13 @@ export class StimPanel {
 
   private onMessage(msg: any) {
     if (msg.command === "ready") {
+      const dem = this.kind === "dem";
       this.panel.webview.postMessage({
         command: "init",
-        bases: BASE_TYPES,
-        tickDependentBases: TICK_DEPENDENT_BASES,
+        kind: this.kind,
+        // A DEM only supports the match graph; circuits get the full set.
+        bases: dem ? BASE_TYPES.filter((b) => b.id === "matchgraph") : BASE_TYPES,
+        tickDependentBases: dem ? [] : TICK_DEPENDENT_BASES,
         dimCapableBases: DIM_CAPABLE_BASES,
         base: this.base,
         withOps: this.withOps,
@@ -225,6 +237,10 @@ export class StimPanel {
 
   async refresh() {
     const text = this.doc.getText();
+    if (this.kind === "dem") {
+      await this.refreshDem(text);
+      return;
+    }
     void this.sendStats(text);
     const type = this.currentType();
     const dependent = this.isTickDependent();
@@ -288,11 +304,62 @@ export class StimPanel {
     }
   }
 
+  // Render the match graph straight from a detector error model.
+  private async refreshDem(text: string) {
+    void this.sendDemStats(text);
+    const type: DemDiagramType = this.effectiveThreeD()
+      ? "matchgraph-3d-html"
+      : "matchgraph-svg";
+    try {
+      const out = await renderDemDiagram(text, type);
+      if (isHtmlDiagram(type)) {
+        this.panel.webview.postMessage({ command: "html", html: out, type });
+      } else {
+        this.panel.webview.postMessage({ command: "svg", svg: out, type, tickShown: false });
+      }
+    } catch (e: any) {
+      this.panel.webview.postMessage({ command: "error", message: String(e?.message ?? e) });
+    }
+  }
+
+  private postStats(title: string, rows: [string, number][] | null) {
+    this.panel.webview.postMessage({ command: "stats", title, rows });
+  }
+
   // Send circuit summary counts to the webview's info tooltip.
   private async sendStats(text: string) {
     try {
-      const stats = await getCircuitStats(text);
-      this.panel.webview.postMessage({ command: "stats", stats });
+      const s = await getCircuitStats(text);
+      if (s.error) {
+        this.postStats("Circuit", null);
+        return;
+      }
+      this.postStats("Circuit", [
+        ["Qubits", s.qubits],
+        ["Measurements", s.measurements],
+        ["Detectors", s.detectors],
+        ["Observables", s.observables],
+        ["Ticks", s.ticks],
+        ["Sweep bits", s.sweepBits],
+      ]);
+    } catch {
+      // Ignore; the tooltip just keeps its previous content.
+    }
+  }
+
+  // Send detector-error-model counts to the webview's info tooltip.
+  private async sendDemStats(text: string) {
+    try {
+      const s = await getDemStats(text);
+      if (s.error) {
+        this.postStats("Detector error model", null);
+        return;
+      }
+      this.postStats("Detector error model", [
+        ["Detectors", s.detectors],
+        ["Observables", s.observables],
+        ["Errors", s.errors],
+      ]);
     } catch {
       // Ignore; the tooltip just keeps its previous content.
     }

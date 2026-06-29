@@ -4,17 +4,26 @@
   "description": "Syntax highlighting and circuit visualization for stim files",
   "version": "0.0.1",
   "publisher": "local",
+  "author": "Rafael Haenel",
+  "license": "MIT",
   "icon": "icon.png",
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Programming Languages", "Visualization"],
+  "keywords": ["stim", "quantum", "quantum error correction", "circuit", "visualization"],
   "main": "./dist/extension.js",
-  "activationEvents": ["onLanguage:stim"],
+  "activationEvents": ["onLanguage:stim", "onLanguage:dem"],
   "contributes": {
     "languages": [
       {
         "id": "stim",
         "aliases": ["Stim", "stim"],
         "extensions": [".stim"],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "dem",
+        "aliases": ["Stim DEM", "dem"],
+        "extensions": [".dem"],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -23,6 +32,11 @@
         "language": "stim",
         "scopeName": "source.stim",
         "path": "./syntaxes/stim.tmLanguage.json"
+      },
+      {
+        "language": "dem",
+        "scopeName": "source.dem",
+        "path": "./syntaxes/dem.tmLanguage.json"
       }
     ],
     "commands": [
@@ -36,7 +50,7 @@
       "editor/title": [
         {
           "command": "stim.visualize",
-          "when": "resourceLangId == stim",
+          "when": "resourceLangId == stim || resourceLangId == dem",
           "group": "navigation"
         }
       ]

@@ -88,4 +88,17 @@ assert.ok(
 );
 console.log("OK approximate_disjoint_errors");
 
+// .dem support: match graph drawn straight from a detector error model.
+const DEM = "error(0.1) D0 D1\nerror(0.1) D1 D2 L0\ndetector(0,0) D0\ndetector(1,0) D1\ndetector(2,0) D2\nlogical_observable L0\n";
+assert.ok(Module.dem_diagram(DEM, "matchgraph-svg").includes("<svg"), "dem matchgraph-svg should render");
+assert.ok(
+  Module.dem_diagram(DEM, "matchgraph-3d-html").includes("<!DOCTYPE html>"),
+  "dem matchgraph-3d-html should render"
+);
+const demStats = JSON.parse(Module.dem_stats_json(DEM));
+assert.strictEqual(demStats.detectors, 3, "expected 3 detectors");
+assert.strictEqual(demStats.observables, 1, "expected 1 observable");
+assert.strictEqual(demStats.errors, 2, "expected 2 errors");
+console.log("OK dem support");
+
 console.log("ALL WASM CHECKS PASSED");

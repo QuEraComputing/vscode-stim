@@ -6,8 +6,9 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand("stim.visualize", () => {
       const editor = vscode.window.activeTextEditor;
-      if (!editor || editor.document.languageId !== "stim") {
-        vscode.window.showWarningMessage("Open a .stim file to visualize it.");
+      const lang = editor?.document.languageId;
+      if (!editor || (lang !== "stim" && lang !== "dem")) {
+        vscode.window.showWarningMessage("Open a .stim or .dem file to visualize it.");
         return;
       }
       StimPanel.createOrShow(context, editor.document);
@@ -16,7 +17,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument((doc) => {
-      if (doc.languageId === "stim") {
+      if (doc.languageId === "stim" || doc.languageId === "dem") {
         StimPanel.refreshForDocument(doc);
       }
     })

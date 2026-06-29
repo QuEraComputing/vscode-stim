@@ -47,7 +47,19 @@ interface StimModule {
   ): string;
   count_ticks(text: string): number;
   circuit_stats_json(text: string): string;
+  dem_diagram(text: string, type: string): string;
+  dem_stats_json(text: string): string;
   gate_data_json(): string;
+}
+
+// Diagram types available for a detector error model (.dem) file.
+export type DemDiagramType = "matchgraph-svg" | "matchgraph-3d-html";
+
+export interface DemStats {
+  detectors: number;
+  observables: number;
+  errors: number;
+  error?: string;
 }
 
 export interface CircuitStats {
@@ -147,6 +159,36 @@ export async function getGateData(): Promise<GateInfo[]> {
       });
   }
   return gateDataPromise;
+}
+
+// Match-graph diagram drawn directly from a detector error model (.dem).
+export async function renderDemDiagram(
+  demText: string,
+  type: DemDiagramType
+): Promise<string> {
+  const mod = await loadModule();
+  let result: string;
+  try {
+    result = mod.dem_diagram(demText, type);
+  } catch (e: any) {
+    modulePromise = undefined;
+    throw new Error(`stim failed to render ${type}: ${String(e?.message ?? e)}`);
+  }
+  if (result.startsWith(ERROR_SENTINEL)) {
+    throw new Error(result.slice(ERROR_SENTINEL.length));
+  }
+  return result;
+}
+
+// Summary counts for a detector error model, or `error` set if unparsable.
+export async function getDemStats(demText: string): Promise<DemStats> {
+  const mod = await loadModule();
+  try {
+    return JSON.parse(mod.dem_stats_json(demText)) as DemStats;
+  } catch (e: any) {
+    modulePromise = undefined;
+    throw new Error(`stim failed to read DEM stats: ${String(e?.message ?? e)}`);
+  }
 }
 
 // Summary counts for the circuit (qubits, measurements, detectors, ...), or an
