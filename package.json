@@ -1,0 +1,59 @@
+{
+  "name": "stim-vscode",
+  "displayName": "Stim",
+  "description": "Syntax highlighting and circuit visualization for stim files",
+  "version": "0.0.1",
+  "publisher": "local",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Programming Languages", "Visualization"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "stim",
+        "aliases": ["Stim", "stim"],
+        "extensions": [".stim"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "stim",
+        "scopeName": "source.stim",
+        "path": "./syntaxes/stim.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "stim.visualize",
+        "title": "Stim: Visualize Circuit",
+        "icon": "$(graph)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "stim.visualize",
+          "when": "resourceLangId == stim",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "build:wasm": "bash wasm/build-wasm.sh",
+    "test:wasm": "node wasm/harness.mjs",
+    "test:grammar": "vscode-tmgrammar-test \"test/grammar/*.stim\"",
+    "test:engine": "node --test test/engine.test.mjs",
+    "vscode:prepublish": "node esbuild.js --production"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.4.0",
+    "vscode-tmgrammar-test": "^0.1.3"
+  }
+}
