@@ -5,19 +5,32 @@
   const status = document.getElementById("status");
   const tickControl = document.getElementById("tick-control");
   const tickValue = document.getElementById("tick-value");
+  const noiseBtn = document.getElementById("toggle-noise");
+  const fullBtn = document.getElementById("toggle-full");
 
-  let state = { types: [], tickDependent: [], current: null, tick: 1 };
+  let state = {
+    types: [],
+    tickDependent: [],
+    current: null,
+    tick: 1,
+    withoutNoise: false,
+    full: false,
+  };
+
+  function isTickDependent() {
+    return state.tickDependent.includes(state.current);
+  }
 
   function renderToolbar() {
     for (const btn of [...toolbar.querySelectorAll("button.type-btn")]) btn.remove();
-    const anchor = tickControl;
+    const anchor = toolbar.querySelector(".sep");
     for (const type of state.types) {
       const btn = document.createElement("button");
       btn.className = "type-btn" + (type === state.current ? " active" : "");
       btn.textContent = type.replace(/-svg$/, "");
       btn.addEventListener("click", () => {
         state.current = type;
-        updateTickVisibility();
+        updateControls();
         renderToolbar();
         vscode.postMessage({ command: "setType", type });
       });
@@ -25,10 +38,29 @@
     }
   }
 
-  function updateTickVisibility() {
-    const dependent = state.tickDependent.includes(state.current);
-    tickControl.classList.toggle("visible", dependent);
+  function updateControls() {
+    const dependent = isTickDependent();
+    // The single-tick stepper is only meaningful for slice types and when not
+    // showing every tick at once.
+    tickControl.classList.toggle("visible", dependent && !state.full);
+    // Full mode only applies to slice types.
+    fullBtn.disabled = !dependent;
+    fullBtn.classList.toggle("active", state.full && dependent);
+    noiseBtn.classList.toggle("active", state.withoutNoise);
   }
+
+  noiseBtn.addEventListener("click", () => {
+    state.withoutNoise = !state.withoutNoise;
+    updateControls();
+    vscode.postMessage({ command: "setWithoutNoise", value: state.withoutNoise });
+  });
+
+  fullBtn.addEventListener("click", () => {
+    if (fullBtn.disabled) return;
+    state.full = !state.full;
+    updateControls();
+    vscode.postMessage({ command: "setFull", value: state.full });
+  });
 
   document.getElementById("tick-prev").addEventListener("click", () => setTick(state.tick - 1));
   document.getElementById("tick-next").addEventListener("click", () => setTick(state.tick + 1));
@@ -38,6 +70,116 @@
     vscode.postMessage({ command: "setTick", tick: state.tick });
   }
 
+  // Arrow keys step the tick when the single-tick stepper is active.
+  window.addEventListener("keydown", (e) => {
+    if (!isTickDependent() || state.full) return;
+    if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+    if (e.key === "ArrowLeft") {
+      setTick(state.tick - 1);
+      e.preventDefault();
+    } else if (e.key === "ArrowRight") {
+      setTick(state.tick + 1);
+      e.preventDefault();
+    }
+  });
+
+  // Wrap a raw SVG string in a zoomable, scrollable container. Ctrl/Cmd + wheel
+  // (and trackpad pinch, which the browser reports as ctrl+wheel) zooms toward
+  // the cursor; plain scroll pans. Ported from the tsim wrap_svg_zoomable helper.
+  function makeZoomable(svgString, height) {
+    const wrap = document.createElement("div");
+    wrap.className = "zoom-wrap";
+    wrap.style.height = height + "px";
+
+    const sizer = document.createElement("div");
+    sizer.className = "zoom-sizer";
+    const xform = document.createElement("div");
+    xform.className = "zoom-xform";
+    xform.innerHTML = svgString;
+    sizer.appendChild(xform);
+    wrap.appendChild(sizer);
+
+    const svg = xform.querySelector("svg");
+    let natW = 800;
+    let natH = 200;
+    if (svg) {
+      const vb = (svg.getAttribute("viewBox") || "").split(/\s+/).map(Number);
+      if (vb.length === 4 && vb[2] > 0 && vb[3] > 0) {
+        natW = vb[2];
+        natH = vb[3];
+      }
+      // Stim SVGs only carry a viewBox; give them an explicit pixel size so they
+      // don't collapse inside the inline-block transform container.
+      svg.setAttribute("width", natW);
+      svg.setAttribute("height", natH);
+      svg.style.display = "block";
+    }
+    xform.style.width = natW + "px";
+    xform.style.height = natH + "px";
+
+    let scale = natH > 0 ? height / natH : 1;
+
+    function apply() {
+      xform.style.transform = "scale(" + scale + ")";
+      sizer.style.width = natW * scale + "px";
+      sizer.style.height = natH * scale + "px";
+    }
+
+    // Fit to the container width once it has been laid out.
+    requestAnimationFrame(() => {
+      const cw = wrap.clientWidth;
+      if (cw > 0 && natW > 0) {
+        scale = Math.min(scale, cw / natW);
+        apply();
+      }
+    });
+    apply();
+
+    wrap.addEventListener(
+      "wheel",
+      (e) => {
+        if (!(e.ctrlKey || e.metaKey)) return;
+        e.preventDefault();
+        const rect = wrap.getBoundingClientRect();
+        const mx = e.clientX - rect.left + wrap.scrollLeft;
+        const my = e.clientY - rect.top + wrap.scrollTop;
+        const factor = Math.exp(-e.deltaY * 0.01);
+        const newScale = Math.min(Math.max(0.02, scale * factor), 40);
+        const ratio = newScale / scale;
+        scale = newScale;
+        apply();
+        wrap.scrollLeft = mx * ratio - (e.clientX - rect.left);
+        wrap.scrollTop = my * ratio - (e.clientY - rect.top);
+      },
+      { passive: false }
+    );
+
+    return wrap;
+  }
+
+  function showSingle(svg) {
+    view.replaceChildren(makeZoomable(svg, 700));
+  }
+
+  function showList(items) {
+    const frag = document.createDocumentFragment();
+    for (const item of items) {
+      const label = document.createElement("div");
+      label.className = "tick-label";
+      label.textContent = "tick " + item.tick;
+      frag.appendChild(label);
+      frag.appendChild(makeZoomable(item.svg, 360));
+    }
+    view.replaceChildren(frag);
+  }
+
+  function showError(message) {
+    const pre = document.createElement("pre");
+    pre.className = "error";
+    pre.textContent = message;
+    view.replaceChildren(pre);
+  }
+
   window.addEventListener("message", (event) => {
     const msg = event.data;
     if (msg.command === "init") {
@@ -45,18 +187,24 @@
       state.tickDependent = msg.tickDependent;
       state.current = msg.current;
       state.tick = msg.tick;
+      state.withoutNoise = msg.withoutNoise;
+      state.full = msg.full;
       tickValue.textContent = String(state.tick);
       renderToolbar();
-      updateTickVisibility();
+      updateControls();
     } else if (msg.command === "svg") {
-      status.textContent = `${msg.type}${msg.tickShown ? " · tick " + msg.tick : ""}`;
-      view.innerHTML = msg.svg;
+      status.textContent =
+        `${msg.type}${msg.tickShown ? " · tick " + msg.tick : ""}` +
+        `${state.withoutNoise ? " · no noise" : ""}`;
+      showSingle(msg.svg);
+    } else if (msg.command === "svgList") {
+      status.textContent =
+        `${msg.type} · full (${msg.items.length} ticks)` +
+        `${state.withoutNoise ? " · no noise" : ""}`;
+      showList(msg.items);
     } else if (msg.command === "error") {
       status.textContent = "error";
-      const pre = document.createElement("pre");
-      pre.className = "error";
-      pre.textContent = msg.message;
-      view.replaceChildren(pre);
+      showError(msg.message);
     } else if (msg.command === "loading") {
       status.textContent = "rendering…";
     }

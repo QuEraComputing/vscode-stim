@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import {
   renderDiagram,
+  countTicks,
   SVG_DIAGRAM_TYPES,
   TICK_DEPENDENT,
   DiagramType,
@@ -12,6 +13,8 @@ export class StimPanel {
 
   private currentType: DiagramType = "timeline-svg";
   private tick = 1;
+  private withoutNoise = false;
+  private full = false;
   private disposables: vscode.Disposable[] = [];
 
   static createOrShow(context: vscode.ExtensionContext, doc: vscode.TextDocument) {
@@ -60,6 +63,8 @@ export class StimPanel {
         tickDependent: [...TICK_DEPENDENT],
         current: this.currentType,
         tick: this.tick,
+        withoutNoise: this.withoutNoise,
+        full: this.full,
       });
       this.refresh();
     } else if (msg.command === "setType") {
@@ -68,27 +73,69 @@ export class StimPanel {
     } else if (msg.command === "setTick") {
       this.tick = msg.tick;
       this.refresh();
+    } else if (msg.command === "setWithoutNoise") {
+      this.withoutNoise = !!msg.value;
+      this.refresh();
+    } else if (msg.command === "setFull") {
+      this.full = !!msg.value;
+      this.refresh();
     }
   }
 
   async refresh() {
     this.panel.webview.postMessage({ command: "loading" });
+    const text = this.doc.getText();
+    const useFull = this.full && TICK_DEPENDENT.has(this.currentType);
     try {
-      const text = this.doc.getText();
-      const svg = await renderDiagram(text, this.currentType, this.tick);
-      this.panel.webview.postMessage({
-        command: "svg",
-        svg,
-        type: this.currentType,
-        tick: this.tick,
-        tickShown: TICK_DEPENDENT.has(this.currentType),
-      });
+      if (useFull) {
+        await this.refreshFull(text);
+      } else {
+        const svg = await renderDiagram(
+          text,
+          this.currentType,
+          this.tick,
+          this.withoutNoise
+        );
+        this.panel.webview.postMessage({
+          command: "svg",
+          svg,
+          type: this.currentType,
+          tick: this.tick,
+          tickShown: TICK_DEPENDENT.has(this.currentType),
+        });
+      }
     } catch (e: any) {
       this.panel.webview.postMessage({
         command: "error",
         message: String(e?.message ?? e),
       });
     }
+  }
+
+  // Full mode: render one slice per tick (1..count_ticks), stacked in the
+  // webview. Ticks that fail to render for this diagram type are skipped.
+  private async refreshFull(text: string) {
+    const n = await countTicks(text);
+    if (n <= 0) {
+      throw new Error("Circuit has no TICK instructions; full mode is unavailable.");
+    }
+    const items: { tick: number; svg: string }[] = [];
+    for (let t = 1; t <= n; t++) {
+      try {
+        const svg = await renderDiagram(text, this.currentType, t, this.withoutNoise);
+        items.push({ tick: t, svg });
+      } catch {
+        // Skip ticks that cannot be rendered for this diagram type.
+      }
+    }
+    if (items.length === 0) {
+      throw new Error("No renderable ticks for this diagram type.");
+    }
+    this.panel.webview.postMessage({
+      command: "svgList",
+      type: this.currentType,
+      items,
+    });
   }
 
   private dispose() {
@@ -115,10 +162,13 @@ export class StimPanel {
 </head>
 <body>
   <div id="toolbar">
+    <span class="sep"></span>
+    <button id="toggle-noise" class="toggle-btn" title="Render the circuit with all noise operations removed (stim.Circuit.without_noise)">without noise</button>
+    <button id="toggle-full" class="toggle-btn" title="Show every tick stacked vertically (slice diagrams only)">full</button>
     <div id="tick-control">
-      <button id="tick-prev">◀</button>
+      <button id="tick-prev" title="Previous tick (←)">◀</button>
       <span>tick <span id="tick-value">1</span></span>
-      <button id="tick-next">▶</button>
+      <button id="tick-next" title="Next tick (→)">▶</button>
     </div>
     <span id="status"></span>
   </div>
