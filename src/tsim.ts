@@ -3,7 +3,7 @@
 //
 // Pipeline (visualization only):
 //   1. shorthandToStim:  T 0 1            -> S[T] 0 1            (valid stim)
-//   2. toPlaceholders:   S[T] 0 1         -> X_ERROR(id) 0 ...   (+ label map)
+//   2. toPlaceholders:   S[T] 0 1         -> I_ERROR(id) 0 ...   (+ label map)
 //   3. stim renders the placeholder circuit (boxes with a red id text)
 //   4. relabelSvg (webview): swap the placeholder boxes back to T / R_X / ...
 //
@@ -121,10 +121,10 @@ export interface Placeholders {
   labels: PlaceholderLabel[];
 }
 
-// Replace tagged tsim gates with drawable placeholders for the timeline/timeslice
-// diagram. T-family and rotations become X_ERROR(id) markers (one per qubit,
-// relabeled later); TPP doubles its Pauli targets so the SVG yields duplicate
-// boxes that the de-dup step renames to TPP.
+// Replace single-qubit tsim gates (T-family, rotations, U3) with I_ERROR(id)
+// markers, one per qubit, to be relabeled later. Pauli-product gates
+// (TPP/R_XX/R_PAULI, which lower to SPP[...]) pass through and render as their
+// SPP box; stim ignores the tag when drawing.
 export function toPlaceholders(loweredText: string): Placeholders {
   const labels: PlaceholderLabel[] = [];
   let counter = 0;
@@ -133,7 +133,6 @@ export function toPlaceholders(loweredText: string): Placeholders {
   const nextId = () => Math.round((0.001 + ++counter * 1e-6) * 1e6) / 1e6;
 
   const reT = /^(\s*)(S|S_DAG)\[(T(?::[^\]\n]*)?)\]\s+(.+?)\s*$/;
-  const reTpp = /^(\s*)(SPP|SPP_DAG)\[(T(?::[^\]\n]*)?)\]\s+(.+?)\s*$/;
   const reRot = new RegExp(`^(\\s*)I\\[R_([XYZ])\\(theta=(${FLOAT})\\*pi\\)\\]\\s+(.+?)\\s*$`);
   const reU3 = /^(\s*)I\[U3\([^\]]*\)\]\s+(.+?)\s*$/;
 
@@ -147,7 +146,7 @@ export function toPlaceholders(loweredText: string): Placeholders {
       for (const tgt of targets.split(/\s+/)) {
         const id = nextId();
         labels.push({ id, label });
-        out.push(`${indent}X_ERROR(${id}) ${tgt}`);
+        out.push(`${indent}I_ERROR(${id}) ${tgt}`);
       }
       continue;
     }
@@ -159,7 +158,7 @@ export function toPlaceholders(loweredText: string): Placeholders {
       for (const tgt of targets.split(/\s+/)) {
         const id = nextId();
         labels.push({ id, label, annotation });
-        out.push(`${indent}X_ERROR(${id}) ${tgt}`);
+        out.push(`${indent}I_ERROR(${id}) ${tgt}`);
       }
       continue;
     }
@@ -169,20 +168,8 @@ export function toPlaceholders(loweredText: string): Placeholders {
       for (const tgt of targets.split(/\s+/)) {
         const id = nextId();
         labels.push({ id, label: "U3" });
-        out.push(`${indent}X_ERROR(${id}) ${tgt}`);
+        out.push(`${indent}I_ERROR(${id}) ${tgt}`);
       }
-      continue;
-    }
-
-    if ((m = reTpp.exec(line))) {
-      // Double each Pauli target (keep combiners) so stim draws overlapping
-      // boxes; the SVG de-dup step removes the copy and renames SPP -> TPP.
-      const [, indent, name, , product] = m;
-      const doubled = product
-        .split("*")
-        .map((p) => `${p}*${p}`)
-        .join("*");
-      out.push(`${indent}${name} ${doubled}`);
       continue;
     }
 
@@ -195,7 +182,7 @@ function escapeXml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// Relabel a rendered SVG: each X_ERROR placeholder draws an "ERR" box followed
+// Relabel a rendered SVG: each I_ERROR placeholder draws an "ERR" box followed
 // by a red probability text (the id). Swap the box text for the gate label, and
 // either turn the red id into the gate's annotation or drop it. Mirrors tsim's
 // placeholders_to_t, done with regex on the SVG string.
@@ -217,21 +204,5 @@ export function relabelSvg(svg: string, labels: PlaceholderLabel[]): string {
     }
     return newErr;
   });
-  // TPP was rendered as a doubled SPP; rename the box label.
-  out = renameSppToTpp(out);
-  return out;
-}
-
-// Collapse the doubled SPP boxes from a TPP placeholder into one and rename the
-// label SPP -> TPP. Mirrors tsim's _deduplicate_doubled_spp.
-function renameSppToTpp(svg: string): string {
-  // Drop an immediately-repeated black rect + white SPP text at the same x/y.
-  const dup =
-    /(<rect\b[^>]*\bfill="black"[^>]*\bx="([\d.]+)"[^>]*\by="([\d.]+)"[^>]*\/>\s*<text\b[^>]*\bfill="white"[^>]*>)(SPP(?:_DAG)?)(<\/text>)\s*<rect\b[^>]*\bfill="black"[^>]*\bx="\2"[^>]*\by="\3"[^>]*\/>\s*<text\b[^>]*\bfill="white"[^>]*>SPP(?:_DAG)?<\/text>/g;
-  let out = svg.replace(dup, (_full, head, _x, _y, name, close) => {
-    return `${head}${name.replace("SPP", "TPP")}${close}`;
-  });
-  // Any remaining standalone SPP[T] boxes (not doubled) still read SPP; rename.
-  out = out.replace(/(<text\b[^>]*\bfill="white"[^>]*>)SPP(_DAG)?(<\/text>)/g, "$1TPP$2$3");
   return out;
 }

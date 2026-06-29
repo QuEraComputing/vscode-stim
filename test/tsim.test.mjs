@@ -23,7 +23,7 @@ test("placeholders carry gate labels and annotations", () => {
   const ph = toPlaceholders(shorthandToStim("R 0\nTICK\nT 0\nR_X(0.5) 0\n"));
   assert.ok(ph.labels.some((l) => l.label === "T"));
   assert.ok(ph.labels.some((l) => l.label === "R_X" && l.annotation === "0.5π"));
-  assert.match(ph.text, /X_ERROR\(/);
+  assert.match(ph.text, /I_ERROR\(/);
 });
 
 test("relabel restores gate names in the rendered svg", async () => {
