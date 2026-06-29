@@ -243,11 +243,11 @@ static std::string gate_data_json() {
         out += "{\"name\":\"";
         json_escape_to(g.name, out);
         out += "\",\"category\":\"";
-        json_escape_to(g.category ? g.category : "", out);
+        json_escape_to(g.category, out);
         out += "\",\"args\":";
         out += std::to_string((int)g.arg_count);
         out += ",\"help\":\"";
-        json_escape_to(g.help ? g.help : "", out);
+        json_escape_to(g.help, out);
         out += "\"}";
     }
     out += "]";
