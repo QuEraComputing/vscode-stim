@@ -5,11 +5,11 @@ import { renderDiagram, countTicks, DiagramType } from "./stimEngine";
 // diagram-type string is derived from the base plus its sub-toggles.
 type BaseType = "timeline" | "timeslice" | "detslice" | "matchgraph";
 
-const BASE_TYPES: { id: BaseType; label: string }[] = [
-  { id: "timeline", label: "timeline" },
-  { id: "timeslice", label: "timeslice" },
-  { id: "detslice", label: "detslice" },
-  { id: "matchgraph", label: "matchgraph" },
+const BASE_TYPES: { id: BaseType; label: string; short: string }[] = [
+  { id: "timeline", label: "timeline", short: "tl" },
+  { id: "timeslice", label: "timeslice", short: "ts" },
+  { id: "detslice", label: "detslice", short: "d" },
+  { id: "matchgraph", label: "matchgraph", short: "m" },
 ];
 
 // Bases that render a per-tick slice (so they get the tick stepper + full mode).

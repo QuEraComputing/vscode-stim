@@ -34,7 +34,15 @@
     for (const b of state.bases) {
       const btn = document.createElement("button");
       btn.className = "seg-btn" + (b.id === state.base ? " active" : "");
-      btn.textContent = b.label;
+      btn.title = b.label;
+      // Both labels are present; CSS shows the short one when the panel is narrow.
+      const lg = document.createElement("span");
+      lg.className = "seg-lg";
+      lg.textContent = b.label;
+      const sm = document.createElement("span");
+      sm.className = "seg-sm";
+      sm.textContent = b.short;
+      btn.append(lg, sm);
       btn.addEventListener("click", () => {
         if (state.base === b.id) return;
         state.base = b.id;

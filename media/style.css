@@ -52,6 +52,21 @@ body {
   background: var(--vscode-button-background);
   color: var(--vscode-button-foreground);
 }
+.seg-sm {
+  display: none;
+}
+/* On a narrow panel, swap the full labels for short codes (tl|ts|d|m). */
+@media (max-width: 360px) {
+  .seg-lg {
+    display: none;
+  }
+  .seg-sm {
+    display: inline;
+  }
+  .seg-btn {
+    padding: 4px 10px;
+  }
+}
 
 /* On/off toggle switches themed with VS Code colors. */
 .switch {
