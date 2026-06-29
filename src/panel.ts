@@ -15,7 +15,7 @@ const BASE_TYPES: { id: BaseType; label: string; short: string }[] = [
   { id: "timeline", label: "timeline", short: "line" },
   { id: "timeslice", label: "timeslice", short: "slice" },
   { id: "detslice", label: "detslice", short: "det" },
-  { id: "matchgraph", label: "matchgraph", short: "mgraph" },
+  { id: "matchgraph", label: "matchgraph", short: "m" },
 ];
 
 // Bases that render a per-tick slice (so they get the tick stepper + full mode).
@@ -60,7 +60,7 @@ export class StimPanel {
     }
     const panel = vscode.window.createWebviewPanel(
       StimPanel.viewType,
-      `Stim: ${doc.uri.path.split("/").pop()}`,
+      doc.uri.path.split("/").pop() || "stim",
       vscode.ViewColumn.Beside,
       {
         enableScripts: true,
