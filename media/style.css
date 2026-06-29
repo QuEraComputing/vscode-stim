@@ -211,18 +211,18 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   padding: 0;
-  border: 1px solid var(--vscode-panel-border);
+  border: none;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.35);
   color: #888;
   cursor: pointer;
 }
 .copy-btn:hover {
   color: #333;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.7);
 }
 .copy-btn.copied {
   color: #2a8a3e;

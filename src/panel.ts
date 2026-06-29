@@ -1,4 +1,8 @@
 import * as vscode from "vscode";
+import * as os from "os";
+import * as path from "path";
+import * as fs from "fs";
+import { execFile } from "child_process";
 import {
   renderDiagram,
   renderDiagramFull,
@@ -175,7 +179,7 @@ export class StimPanel {
       // Requested by the webview after the panel finishes resizing.
       this.refresh();
     } else if (msg.command === "copySvg") {
-      void vscode.env.clipboard.writeText(String(msg.svg ?? ""));
+      void this.copySvgToClipboard(String(msg.svg ?? ""));
     } else if (msg.command === "setBase") {
       this.base = msg.base;
       this.refresh();
@@ -265,6 +269,41 @@ export class StimPanel {
         command: "error",
         message: String(e?.message ?? e),
       });
+    }
+  }
+
+  // Put the SVG on the clipboard as a *file reference* (like copying a .svg in
+  // Finder), so PowerPoint pastes it as a vector picture. macOS only, via
+  // osascript; elsewhere we fall back to copying the markup as text.
+  private async copySvgToClipboard(svg: string) {
+    if (process.platform !== "darwin") {
+      await vscode.env.clipboard.writeText(svg);
+      vscode.window.showInformationMessage(
+        "Copied the SVG markup. Pasting as a file is only supported on macOS."
+      );
+      return;
+    }
+    try {
+      const dir = path.join(os.tmpdir(), "stim-vscode");
+      await fs.promises.mkdir(dir, { recursive: true });
+      const base = (this.doc.uri.path.split("/").pop() || "diagram").replace(/\.stim$/, "");
+      const typeName = this.currentType().replace(/-svg$/, "");
+      const file = path.join(dir, `${base}-${typeName}.svg`);
+      await fs.promises.writeFile(file, svg, "utf8");
+      await new Promise<void>((resolve, reject) => {
+        execFile(
+          "osascript",
+          ["-e", `set the clipboard to POSIX file ${JSON.stringify(file)}`],
+          (err) => (err ? reject(err) : resolve())
+        );
+      });
+    } catch (e: any) {
+      await vscode.env.clipboard.writeText(svg);
+      vscode.window.showWarningMessage(
+        `Could not copy the SVG file to the clipboard (${String(
+          e?.message ?? e
+        )}); copied the markup instead.`
+      );
     }
   }
 

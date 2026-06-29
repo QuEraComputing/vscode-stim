@@ -296,17 +296,17 @@
   let currentKind = null;
 
   const COPY_ICON =
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
   const CHECK_ICON =
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
 
-  // Gray copy button pinned to the top-right of the SVG; copies the SVG markup
-  // to the clipboard (via the host, to avoid webview clipboard restrictions).
+  // Gray copy button pinned to the top-right of the SVG. The host copies the SVG
+  // as a file reference so it pastes into PowerPoint as a vector picture.
   function makeCopyButton(svgString) {
     const btn = document.createElement("button");
     btn.className = "copy-btn";
-    btn.title = "Copy SVG to clipboard";
-    btn.setAttribute("aria-label", "Copy SVG to clipboard");
+    btn.title = "Copy diagram (paste into PowerPoint as SVG)";
+    btn.setAttribute("aria-label", "Copy diagram as SVG");
     btn.innerHTML = COPY_ICON;
     btn.addEventListener("click", () => {
       vscode.postMessage({ command: "copySvg", svg: svgString });
@@ -316,7 +316,7 @@
       setTimeout(() => {
         btn.innerHTML = COPY_ICON;
         btn.classList.remove("copied");
-        btn.title = "Copy SVG to clipboard";
+        btn.title = "Copy diagram (paste into PowerPoint as SVG)";
       }, 1200);
     });
     return btn;
