@@ -34,14 +34,16 @@ interface StimModule {
     type: string,
     tick: number,
     withoutNoise: boolean,
-    approxDisjoint: boolean
+    approxDisjoint: boolean,
+    decomposeErrors: boolean
   ): string;
   diagram_full(
     text: string,
     type: string,
     rows: number,
     withoutNoise: boolean,
-    approxDisjoint: boolean
+    approxDisjoint: boolean,
+    decomposeErrors: boolean
   ): string;
   count_ticks(text: string): number;
   circuit_stats_json(text: string): string;
@@ -86,12 +88,13 @@ export async function renderDiagram(
   type: DiagramType,
   tick: number,
   withoutNoise = false,
-  approxDisjoint = true
+  approxDisjoint = true,
+  decomposeErrors = false
 ): Promise<string> {
   const mod = await loadModule();
   let result: string;
   try {
-    result = mod.diagram(circuitText, type, tick, withoutNoise, approxDisjoint);
+    result = mod.diagram(circuitText, type, tick, withoutNoise, approxDisjoint, decomposeErrors);
   } catch (e: any) {
     // A wasm trap (e.g. a slice tick on a circuit with no TICKs) poisons the
     // module instance. Drop it so the next render gets a fresh module.
@@ -113,12 +116,13 @@ export async function renderDiagramFull(
   type: DiagramType,
   rows: number,
   withoutNoise = false,
-  approxDisjoint = true
+  approxDisjoint = true,
+  decomposeErrors = false
 ): Promise<string> {
   const mod = await loadModule();
   let result: string;
   try {
-    result = mod.diagram_full(circuitText, type, rows, withoutNoise, approxDisjoint);
+    result = mod.diagram_full(circuitText, type, rows, withoutNoise, approxDisjoint, decomposeErrors);
   } catch (e: any) {
     modulePromise = undefined;
     throw new Error(`stim failed to render ${type}: ${String(e?.message ?? e)}`);

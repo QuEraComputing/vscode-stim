@@ -40,6 +40,7 @@ interface PersistedState {
   full: boolean;
   rows: number;
   approxDisjoint: boolean;
+  decomposeErrors: boolean;
 }
 
 export class StimPanel {
@@ -52,6 +53,7 @@ export class StimPanel {
   private full = false;
   private threeD = false; // timeline/matchgraph: interactive 3D viewer
   private approxDisjoint = true; // matchgraph: approximate_disjoint_errors
+  private decomposeErrors = false; // matchgraph: split hyperedges into pairs
   private tick = 1;
   private rows = 0; // full mode: layout rows (0 = stim auto)
   private disposables: vscode.Disposable[] = [];
@@ -114,6 +116,7 @@ export class StimPanel {
     if (typeof s.approxDisjoint === "boolean") {
       this.approxDisjoint = s.approxDisjoint;
     }
+    this.decomposeErrors = !!s.decomposeErrors;
   }
 
   private saveState() {
@@ -125,6 +128,7 @@ export class StimPanel {
       full: this.full,
       rows: this.rows,
       approxDisjoint: this.approxDisjoint,
+      decomposeErrors: this.decomposeErrors,
     };
     void this.context.globalState.update(STATE_KEY, s);
   }
@@ -172,6 +176,7 @@ export class StimPanel {
         full: this.full,
         threeD: this.threeD,
         approxDisjoint: this.approxDisjoint,
+        decomposeErrors: this.decomposeErrors,
         tick: this.tick,
         rows: this.rows,
       });
@@ -189,6 +194,9 @@ export class StimPanel {
       this.refresh();
     } else if (msg.command === "setApproxDisjoint") {
       this.approxDisjoint = !!msg.value;
+      this.refresh();
+    } else if (msg.command === "setDecomposeErrors") {
+      this.decomposeErrors = !!msg.value;
       this.refresh();
     } else if (msg.command === "setWithOps") {
       this.withOps = !!msg.value;
@@ -242,11 +250,15 @@ export class StimPanel {
 
       if (isHtmlDiagram(type)) {
         // Interactive 3D viewer: a full HTML page rendered in an iframe.
-        const html = await renderDiagram(text, type, 0, withoutNoise, this.approxDisjoint);
+        const html = await renderDiagram(
+          text, type, 0, withoutNoise, this.approxDisjoint, this.decomposeErrors
+        );
         this.panel.webview.postMessage({ command: "html", html, type });
       } else if (this.full && dependent) {
         // One combined diagram of every tick, laid out in `rows` rows.
-        const svg = await renderDiagramFull(text, type, this.rows, withoutNoise, this.approxDisjoint);
+        const svg = await renderDiagramFull(
+          text, type, this.rows, withoutNoise, this.approxDisjoint, this.decomposeErrors
+        );
         this.panel.webview.postMessage({
           command: "svg",
           svg,
@@ -256,7 +268,9 @@ export class StimPanel {
           tickShown: false,
         });
       } else {
-        const svg = await renderDiagram(text, type, this.tick, withoutNoise, this.approxDisjoint);
+        const svg = await renderDiagram(
+          text, type, this.tick, withoutNoise, this.approxDisjoint, this.decomposeErrors
+        );
         this.panel.webview.postMessage({
           command: "svg",
           svg,
@@ -371,6 +385,10 @@ export class StimPanel {
     <button id="toggle-approx" class="switch" aria-pressed="true" title="Enable approximate_disjoint_errors when building the match graph (needed for e.g. PAULI_CHANNEL_2)">
       <span class="switch-track"><span class="switch-knob"></span></span>
       <span class="switch-label">approx. disjoint errors</span>
+    </button>
+    <button id="toggle-decompose" class="switch" aria-pressed="false" title="Decompose errors: split hyperedges into pairs when building the match graph">
+      <span class="switch-track"><span class="switch-knob"></span></span>
+      <span class="switch-label">decompose errors</span>
     </button>
     <button id="toggle-full" class="switch" aria-pressed="false" title="Show all ticks in one combined diagram (slice diagrams only)">
       <span class="switch-track"><span class="switch-knob"></span></span>

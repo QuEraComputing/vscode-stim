@@ -12,6 +12,7 @@
   const opsBtn = document.getElementById("toggle-ops");
   const noiseBtn = document.getElementById("toggle-noise");
   const approxBtn = document.getElementById("toggle-approx");
+  const decomposeBtn = document.getElementById("toggle-decompose");
   const fullBtn = document.getElementById("toggle-full");
   const rowsControl = document.getElementById("rows-control");
   const rowsInput = document.getElementById("rows-input");
@@ -26,6 +27,7 @@
     withOps: false,
     withoutNoise: false,
     approxDisjoint: true,
+    decomposeErrors: false,
     full: false,
     tick: 1,
     tickMax: 0,
@@ -87,9 +89,13 @@
       state.base !== "matchgraph" && !(state.base === "detslice" && !state.withOps);
     noiseBtn.style.display = noiseVisible ? "" : "none";
     setPressed(noiseBtn, state.withoutNoise);
-    // "approx. disjoint errors" only affects the match graph's error model.
-    approxBtn.style.display = state.base === "matchgraph" ? "" : "none";
+    // "approx. disjoint errors" and "decompose errors" only affect the match
+    // graph's error model.
+    const isMatch = state.base === "matchgraph";
+    approxBtn.style.display = isMatch ? "" : "none";
     setPressed(approxBtn, state.approxDisjoint);
+    decomposeBtn.style.display = isMatch ? "" : "none";
+    setPressed(decomposeBtn, state.decomposeErrors);
     // Full mode only applies to slice (tick-dependent) types.
     fullBtn.style.display = dependent ? "" : "none";
     setPressed(fullBtn, state.full && dependent);
@@ -125,6 +131,12 @@
     state.approxDisjoint = !state.approxDisjoint;
     updateControls();
     vscode.postMessage({ command: "setApproxDisjoint", value: state.approxDisjoint });
+  });
+
+  decomposeBtn.addEventListener("click", () => {
+    state.decomposeErrors = !state.decomposeErrors;
+    updateControls();
+    vscode.postMessage({ command: "setDecomposeErrors", value: state.decomposeErrors });
   });
 
   fullBtn.addEventListener("click", () => {
@@ -398,6 +410,7 @@
       state.withOps = msg.withOps;
       state.withoutNoise = msg.withoutNoise;
       state.approxDisjoint = msg.approxDisjoint !== false;
+      state.decomposeErrors = !!msg.decomposeErrors;
       state.full = msg.full;
       state.tick = msg.tick;
       state.rows = msg.rows || 0;
