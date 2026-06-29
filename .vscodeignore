@@ -8,4 +8,6 @@ wasm/harness.mjs
 esbuild.js
 tsconfig.json
 docs/**
+useful_files/**
+e2e_tmp.mjs
 **/*.map
