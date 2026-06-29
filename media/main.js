@@ -1,53 +1,70 @@
 (function () {
   const vscode = acquireVsCodeApi();
-  const toolbar = document.getElementById("toolbar");
+  const seg = document.getElementById("type-seg");
   const view = document.getElementById("view");
-  const status = document.getElementById("status");
   const tickControl = document.getElementById("tick-control");
   const tickValue = document.getElementById("tick-value");
+  const tickPrev = document.getElementById("tick-prev");
+  const tickNext = document.getElementById("tick-next");
+  const opsBtn = document.getElementById("toggle-ops");
   const noiseBtn = document.getElementById("toggle-noise");
   const fullBtn = document.getElementById("toggle-full");
 
   let state = {
-    types: [],
-    tickDependent: [],
-    current: null,
-    tick: 1,
+    bases: [],
+    tickDependentBases: [],
+    base: null,
+    withOps: false,
     withoutNoise: false,
     full: false,
+    tick: 1,
+    tickMax: 0,
   };
 
   function isTickDependent() {
-    return state.tickDependent.includes(state.current);
+    return state.tickDependentBases.includes(state.base);
   }
 
-  function renderToolbar() {
-    for (const btn of [...toolbar.querySelectorAll("button.type-btn")]) btn.remove();
-    const anchor = toolbar.querySelector(".sep");
-    for (const type of state.types) {
+  function setPressed(btn, on) {
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+  }
+
+  function renderSegmented() {
+    seg.replaceChildren();
+    for (const b of state.bases) {
       const btn = document.createElement("button");
-      btn.className = "type-btn" + (type === state.current ? " active" : "");
-      btn.textContent = type.replace(/-svg$/, "");
+      btn.className = "seg-btn" + (b.id === state.base ? " active" : "");
+      btn.textContent = b.label;
       btn.addEventListener("click", () => {
-        state.current = type;
+        if (state.base === b.id) return;
+        state.base = b.id;
         updateControls();
-        renderToolbar();
-        vscode.postMessage({ command: "setType", type });
+        renderSegmented();
+        vscode.postMessage({ command: "setBase", base: b.id });
       });
-      toolbar.insertBefore(btn, anchor);
+      seg.appendChild(btn);
     }
   }
 
   function updateControls() {
     const dependent = isTickDependent();
-    // The single-tick stepper is only meaningful for slice types and when not
-    // showing every tick at once.
+    // "with ops" only applies to detslice.
+    opsBtn.style.display = state.base === "detslice" ? "" : "none";
+    setPressed(opsBtn, state.withOps);
+    setPressed(noiseBtn, state.withoutNoise);
+    // Full mode only applies to slice (tick-dependent) types.
+    fullBtn.style.display = dependent ? "" : "none";
+    setPressed(fullBtn, state.full && dependent);
+    // The single-tick stepper shows for slice types unless full mode is on.
     tickControl.classList.toggle("visible", dependent && !state.full);
-    // Full mode only applies to slice types.
-    fullBtn.disabled = !dependent;
-    fullBtn.classList.toggle("active", state.full && dependent);
-    noiseBtn.classList.toggle("active", state.withoutNoise);
+    updateTickButtons();
   }
+
+  opsBtn.addEventListener("click", () => {
+    state.withOps = !state.withOps;
+    updateControls();
+    vscode.postMessage({ command: "setWithOps", value: state.withOps });
+  });
 
   noiseBtn.addEventListener("click", () => {
     state.withoutNoise = !state.withoutNoise;
@@ -56,18 +73,26 @@
   });
 
   fullBtn.addEventListener("click", () => {
-    if (fullBtn.disabled) return;
     state.full = !state.full;
     updateControls();
     vscode.postMessage({ command: "setFull", value: state.full });
   });
 
-  document.getElementById("tick-prev").addEventListener("click", () => setTick(state.tick - 1));
-  document.getElementById("tick-next").addEventListener("click", () => setTick(state.tick + 1));
+  tickPrev.addEventListener("click", () => setTick(state.tick - 1));
+  tickNext.addEventListener("click", () => setTick(state.tick + 1));
   function setTick(t) {
-    state.tick = Math.max(0, t);
+    let next = Math.max(1, t);
+    if (state.tickMax > 0) next = Math.min(next, state.tickMax);
+    if (next === state.tick) return;
+    state.tick = next;
     tickValue.textContent = String(state.tick);
+    updateTickButtons();
     vscode.postMessage({ command: "setTick", tick: state.tick });
+  }
+
+  function updateTickButtons() {
+    tickPrev.disabled = state.tick <= 1;
+    tickNext.disabled = state.tickMax > 0 && state.tick >= state.tickMax;
   }
 
   // Arrow keys step the tick when the single-tick stepper is active.
@@ -183,30 +208,29 @@
   window.addEventListener("message", (event) => {
     const msg = event.data;
     if (msg.command === "init") {
-      state.types = msg.types;
-      state.tickDependent = msg.tickDependent;
-      state.current = msg.current;
-      state.tick = msg.tick;
+      state.bases = msg.bases;
+      state.tickDependentBases = msg.tickDependentBases;
+      state.base = msg.base;
+      state.withOps = msg.withOps;
       state.withoutNoise = msg.withoutNoise;
       state.full = msg.full;
+      state.tick = msg.tick;
       tickValue.textContent = String(state.tick);
-      renderToolbar();
+      renderSegmented();
       updateControls();
     } else if (msg.command === "svg") {
-      status.textContent =
-        `${msg.type}${msg.tickShown ? " · tick " + msg.tick : ""}` +
-        `${state.withoutNoise ? " · no noise" : ""}`;
+      // The host clamps the tick to the valid range; mirror its values.
+      if (typeof msg.tick === "number") {
+        state.tick = msg.tick;
+        tickValue.textContent = String(state.tick);
+      }
+      if (typeof msg.tickMax === "number") state.tickMax = msg.tickMax;
+      updateTickButtons();
       showSingle(msg.svg);
     } else if (msg.command === "svgList") {
-      status.textContent =
-        `${msg.type} · full (${msg.items.length} ticks)` +
-        `${state.withoutNoise ? " · no noise" : ""}`;
       showList(msg.items);
     } else if (msg.command === "error") {
-      status.textContent = "error";
       showError(msg.message);
-    } else if (msg.command === "loading") {
-      status.textContent = "rendering…";
     }
   });
 

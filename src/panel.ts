@@ -1,20 +1,29 @@
 import * as vscode from "vscode";
-import {
-  renderDiagram,
-  countTicks,
-  SVG_DIAGRAM_TYPES,
-  TICK_DEPENDENT,
-  DiagramType,
-} from "./stimEngine";
+import { renderDiagram, countTicks, DiagramType } from "./stimEngine";
+
+// Base diagram families shown in the segmented control. The actual stim
+// diagram-type string is derived from the base plus its sub-toggles.
+type BaseType = "timeline" | "timeslice" | "detslice" | "matchgraph";
+
+const BASE_TYPES: { id: BaseType; label: string }[] = [
+  { id: "timeline", label: "timeline" },
+  { id: "timeslice", label: "timeslice" },
+  { id: "detslice", label: "detslice" },
+  { id: "matchgraph", label: "matchgraph" },
+];
+
+// Bases that render a per-tick slice (so they get the tick stepper + full mode).
+const TICK_DEPENDENT_BASES: BaseType[] = ["timeslice", "detslice"];
 
 export class StimPanel {
   public static readonly viewType = "stim.visualizer";
   private static panels = new Map<string, StimPanel>();
 
-  private currentType: DiagramType = "timeline-svg";
-  private tick = 1;
+  private base: BaseType = "timeline";
+  private withOps = false; // detslice: include operations overlay
   private withoutNoise = false;
   private full = false;
+  private tick = 1;
   private disposables: vscode.Disposable[] = [];
 
   static createOrShow(context: vscode.ExtensionContext, doc: vscode.TextDocument) {
@@ -55,23 +64,42 @@ export class StimPanel {
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
   }
 
+  // Resolve the current stim diagram-type string from the UI state.
+  private currentType(): DiagramType {
+    switch (this.base) {
+      case "timeline":
+        return "timeline-svg";
+      case "timeslice":
+        return "timeslice-svg";
+      case "detslice":
+        return this.withOps ? "detslice-with-ops-svg" : "detslice-svg";
+      case "matchgraph":
+        return "matchgraph-svg";
+    }
+  }
+
+  private isTickDependent(): boolean {
+    return TICK_DEPENDENT_BASES.includes(this.base);
+  }
+
   private onMessage(msg: any) {
     if (msg.command === "ready") {
       this.panel.webview.postMessage({
         command: "init",
-        types: SVG_DIAGRAM_TYPES,
-        tickDependent: [...TICK_DEPENDENT],
-        current: this.currentType,
-        tick: this.tick,
+        bases: BASE_TYPES,
+        tickDependentBases: TICK_DEPENDENT_BASES,
+        base: this.base,
+        withOps: this.withOps,
         withoutNoise: this.withoutNoise,
         full: this.full,
+        tick: this.tick,
       });
       this.refresh();
-    } else if (msg.command === "setType") {
-      this.currentType = msg.type;
+    } else if (msg.command === "setBase") {
+      this.base = msg.base;
       this.refresh();
-    } else if (msg.command === "setTick") {
-      this.tick = msg.tick;
+    } else if (msg.command === "setWithOps") {
+      this.withOps = !!msg.value;
       this.refresh();
     } else if (msg.command === "setWithoutNoise") {
       this.withoutNoise = !!msg.value;
@@ -79,29 +107,41 @@ export class StimPanel {
     } else if (msg.command === "setFull") {
       this.full = !!msg.value;
       this.refresh();
+    } else if (msg.command === "setTick") {
+      this.tick = msg.tick;
+      this.refresh();
     }
   }
 
   async refresh() {
-    this.panel.webview.postMessage({ command: "loading" });
     const text = this.doc.getText();
-    const useFull = this.full && TICK_DEPENDENT.has(this.currentType);
+    const type = this.currentType();
+    const dependent = this.isTickDependent();
     try {
-      if (useFull) {
-        await this.refreshFull(text);
+      // Slice diagrams index by tick. Clamp the requested tick to the valid
+      // range [1, count_ticks]; out-of-range ticks make stim divide by zero.
+      let tickMax = 0;
+      if (dependent) {
+        tickMax = await countTicks(text);
+        if (tickMax <= 0) {
+          throw new Error(
+            "Circuit has no TICK instructions; slice diagrams are unavailable."
+          );
+        }
+        this.tick = Math.min(Math.max(1, this.tick), tickMax);
+      }
+
+      if (this.full && dependent) {
+        await this.refreshFull(text, type, tickMax);
       } else {
-        const svg = await renderDiagram(
-          text,
-          this.currentType,
-          this.tick,
-          this.withoutNoise
-        );
+        const svg = await renderDiagram(text, type, this.tick, this.withoutNoise);
         this.panel.webview.postMessage({
           command: "svg",
           svg,
-          type: this.currentType,
+          type,
           tick: this.tick,
-          tickShown: TICK_DEPENDENT.has(this.currentType),
+          tickMax,
+          tickShown: dependent,
         });
       }
     } catch (e: any) {
@@ -114,15 +154,11 @@ export class StimPanel {
 
   // Full mode: render one slice per tick (1..count_ticks), stacked in the
   // webview. Ticks that fail to render for this diagram type are skipped.
-  private async refreshFull(text: string) {
-    const n = await countTicks(text);
-    if (n <= 0) {
-      throw new Error("Circuit has no TICK instructions; full mode is unavailable.");
-    }
+  private async refreshFull(text: string, type: DiagramType, n: number) {
     const items: { tick: number; svg: string }[] = [];
     for (let t = 1; t <= n; t++) {
       try {
-        const svg = await renderDiagram(text, this.currentType, t, this.withoutNoise);
+        const svg = await renderDiagram(text, type, t, this.withoutNoise);
         items.push({ tick: t, svg });
       } catch {
         // Skip ticks that cannot be rendered for this diagram type.
@@ -131,11 +167,7 @@ export class StimPanel {
     if (items.length === 0) {
       throw new Error("No renderable ticks for this diagram type.");
     }
-    this.panel.webview.postMessage({
-      command: "svgList",
-      type: this.currentType,
-      items,
-    });
+    this.panel.webview.postMessage({ command: "svgList", type, items });
   }
 
   private dispose() {
@@ -162,15 +194,24 @@ export class StimPanel {
 </head>
 <body>
   <div id="toolbar">
-    <span class="sep"></span>
-    <button id="toggle-noise" class="toggle-btn" title="Render the circuit with all noise operations removed (stim.Circuit.without_noise)">without noise</button>
-    <button id="toggle-full" class="toggle-btn" title="Show every tick stacked vertically (slice diagrams only)">full</button>
+    <div id="type-seg" class="segmented"></div>
+    <button id="toggle-ops" class="switch" aria-pressed="false" title="Overlay operations on the detector slice (detslice-with-ops-svg)">
+      <span class="switch-track"><span class="switch-knob"></span></span>
+      <span class="switch-label">with ops</span>
+    </button>
+    <button id="toggle-noise" class="switch" aria-pressed="false" title="Render the circuit with all noise operations removed (stim.Circuit.without_noise)">
+      <span class="switch-track"><span class="switch-knob"></span></span>
+      <span class="switch-label">without noise</span>
+    </button>
+    <button id="toggle-full" class="switch" aria-pressed="false" title="Show every tick stacked vertically (slice diagrams only)">
+      <span class="switch-track"><span class="switch-knob"></span></span>
+      <span class="switch-label">full</span>
+    </button>
     <div id="tick-control">
-      <button id="tick-prev" title="Previous tick (←)">◀</button>
-      <span>tick <span id="tick-value">1</span></span>
-      <button id="tick-next" title="Next tick (→)">▶</button>
+      <button id="tick-prev" class="step" title="Previous tick (←)">◀</button>
+      <span class="tick-readout">tick <span id="tick-value">1</span></span>
+      <button id="tick-next" class="step" title="Next tick (→)">▶</button>
     </div>
-    <span id="status"></span>
   </div>
   <div id="view"></div>
   <script nonce="${nonce}" src="${scriptUri}"></script>
