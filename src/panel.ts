@@ -15,6 +15,7 @@ import {
   DiagramType,
   DemDiagramType,
 } from "./stimEngine";
+import { shorthandToStim, toPlaceholders, relabelSvg } from "./tsim";
 
 // Base diagram families shown in the segmented control. The actual stim
 // diagram-type string is derived from the base plus its sub-toggles.
@@ -243,20 +244,24 @@ export class StimPanel {
   }
 
   async refresh() {
-    const text = this.doc.getText();
     if (this.kind === "dem") {
-      await this.refreshDem(text);
+      await this.refreshDem(this.doc.getText());
       return;
     }
+    // Lower tsim shorthand (T, R_X, ...) to tagged stim. Used for every stim
+    // call so the circuit parses and simulates as its Clifford stand-in.
+    const text = shorthandToStim(this.doc.getText());
     void this.sendStats(text);
     const type = this.currentType();
     const dependent = this.isTickDependent();
+    // tsim gates are relabeled only on the pure-layout op diagrams.
+    const relabel = type === "timeline-svg" || type === "timeslice-svg";
     // "without noise" only applies where the toggle is shown: not for the match
     // graph (built from the noise), and for detslice only with the ops overlay.
-    // Force it off elsewhere so a remembered value isn't silently applied.
+    // The placeholder render uses X_ERROR markers, so noise stripping is off there.
     const noiseApplies =
       this.base !== "matchgraph" && !(this.base === "detslice" && !this.withOps);
-    const withoutNoise = noiseApplies ? this.withoutNoise : false;
+    const withoutNoise = relabel ? false : noiseApplies ? this.withoutNoise : false;
     try {
       // Slice diagrams index by tick. Clamp the requested tick to the valid
       // range [1, count_ticks]; out-of-range ticks make stim divide by zero.
@@ -271,6 +276,12 @@ export class StimPanel {
         this.tick = Math.min(Math.max(1, this.tick), tickMax);
       }
 
+      // For relabeled diagrams, render placeholders then swap them for gate
+      // labels; otherwise render the lowered circuit directly.
+      const ph = relabel ? toPlaceholders(text) : null;
+      const src = ph ? ph.text : text;
+      const finish = (svg: string) => (ph ? relabelSvg(svg, ph.labels) : svg);
+
       if (isHtmlDiagram(type)) {
         // Interactive 3D viewer: a full HTML page rendered in an iframe.
         const html = await renderDiagram(
@@ -280,11 +291,11 @@ export class StimPanel {
       } else if (this.full && dependent) {
         // One combined diagram of every tick, laid out in `rows` rows.
         const svg = await renderDiagramFull(
-          text, type, this.rows, withoutNoise, this.approxDisjoint, this.decomposeErrors
+          src, type, this.rows, withoutNoise, this.approxDisjoint, this.decomposeErrors
         );
         this.panel.webview.postMessage({
           command: "svg",
-          svg,
+          svg: finish(svg),
           type,
           tick: this.tick,
           tickMax,
@@ -292,11 +303,11 @@ export class StimPanel {
         });
       } else {
         const svg = await renderDiagram(
-          text, type, this.tick, withoutNoise, this.approxDisjoint, this.decomposeErrors
+          src, type, this.tick, withoutNoise, this.approxDisjoint, this.decomposeErrors
         );
         this.panel.webview.postMessage({
           command: "svg",
-          svg,
+          svg: finish(svg),
           type,
           tick: this.tick,
           tickMax,
