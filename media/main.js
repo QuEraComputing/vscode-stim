@@ -9,6 +9,8 @@
   const opsBtn = document.getElementById("toggle-ops");
   const noiseBtn = document.getElementById("toggle-noise");
   const fullBtn = document.getElementById("toggle-full");
+  const rowsControl = document.getElementById("rows-control");
+  const rowsInput = document.getElementById("rows-input");
 
   let state = {
     bases: [],
@@ -19,6 +21,7 @@
     full: false,
     tick: 1,
     tickMax: 0,
+    rows: 0,
   };
 
   function isTickDependent() {
@@ -68,6 +71,8 @@
     // Full mode only applies to slice (tick-dependent) types.
     fullBtn.style.display = dependent ? "" : "none";
     setPressed(fullBtn, state.full && dependent);
+    // The rows input only matters for the combined full view.
+    rowsControl.style.display = dependent && state.full ? "" : "none";
     // The single-tick stepper shows for slice types unless full mode is on.
     tickControl.classList.toggle("visible", dependent && !state.full);
     updateTickButtons();
@@ -89,6 +94,16 @@
     state.full = !state.full;
     updateControls();
     vscode.postMessage({ command: "setFull", value: state.full });
+  });
+
+  // Rows for the combined full view; blank/<1 means stim's automatic layout.
+  // The native number input handles up/down arrows and the spinner.
+  rowsInput.addEventListener("change", () => {
+    const v = parseInt(rowsInput.value, 10);
+    const rows = Number.isInteger(v) && v > 0 ? v : 0;
+    if (rows === 0) rowsInput.value = "";
+    state.rows = rows;
+    vscode.postMessage({ command: "setRows", rows });
   });
 
   tickPrev.addEventListener("click", () => setTick(state.tick - 1));
@@ -210,18 +225,6 @@
     view.replaceChildren(makeZoomable(svg, { fill: true }));
   }
 
-  function showList(items) {
-    const frag = document.createDocumentFragment();
-    for (const item of items) {
-      const label = document.createElement("div");
-      label.className = "tick-label";
-      label.textContent = "tick " + item.tick;
-      frag.appendChild(label);
-      frag.appendChild(makeZoomable(item.svg, { height: 360 }));
-    }
-    view.replaceChildren(frag);
-  }
-
   function showError(message) {
     const pre = document.createElement("pre");
     pre.className = "error";
@@ -239,7 +242,9 @@
       state.withoutNoise = msg.withoutNoise;
       state.full = msg.full;
       state.tick = msg.tick;
+      state.rows = msg.rows || 0;
       tickValue.textContent = String(state.tick);
+      rowsInput.value = state.rows > 0 ? String(state.rows) : "";
       renderSegmented();
       updateControls();
     } else if (msg.command === "svg") {
@@ -251,8 +256,6 @@
       if (typeof msg.tickMax === "number") state.tickMax = msg.tickMax;
       updateTickButtons();
       showSingle(msg.svg);
-    } else if (msg.command === "svgList") {
-      showList(msg.items);
     } else if (msg.command === "error") {
       showError(msg.message);
     }

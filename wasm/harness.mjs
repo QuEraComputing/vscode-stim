@@ -45,4 +45,13 @@ assert.strictEqual(Module.count_ticks(SAMPLE), 2, "expected 2 ticks");
 assert.strictEqual(Module.count_ticks("NOT_A_GATE 0"), -1, "expected -1 for unparsable circuit");
 console.log("OK count_ticks");
 
+// diagram_full: combined all-tick diagram; rows changes the layout.
+const vb = (s) => /viewBox="[^"]*\s([\d.]+)\s+([\d.]+)"/.exec(s);
+const fullAuto = Module.diagram_full(SAMPLE, "timeslice-svg", 0, false);
+const fullRow1 = Module.diagram_full(SAMPLE, "timeslice-svg", 1, false);
+assert.ok(fullAuto.includes("<svg"), "diagram_full should produce svg");
+assert.ok(vb(fullAuto) && vb(fullRow1), "diagram_full svgs should have viewBox");
+assert.notStrictEqual(vb(fullAuto)[0], vb(fullRow1)[0], "rows should change the layout");
+console.log("OK diagram_full");
+
 console.log("ALL WASM CHECKS PASSED");

@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { renderDiagram, countTicks, DiagramType } from "./stimEngine";
+import { renderDiagram, renderDiagramFull, countTicks, DiagramType } from "./stimEngine";
 
 // Base diagram families shown in the segmented control. The actual stim
 // diagram-type string is derived from the base plus its sub-toggles.
@@ -24,6 +24,7 @@ export class StimPanel {
   private withoutNoise = false;
   private full = false;
   private tick = 1;
+  private rows = 0; // full mode: layout rows (0 = stim auto)
   private disposables: vscode.Disposable[] = [];
 
   static createOrShow(context: vscode.ExtensionContext, doc: vscode.TextDocument) {
@@ -94,6 +95,7 @@ export class StimPanel {
         withoutNoise: this.withoutNoise,
         full: this.full,
         tick: this.tick,
+        rows: this.rows,
       });
       this.refresh();
     } else if (msg.command === "setBase") {
@@ -110,6 +112,11 @@ export class StimPanel {
       this.refresh();
     } else if (msg.command === "setTick") {
       this.tick = msg.tick;
+      this.refresh();
+    } else if (msg.command === "setRows") {
+      // 0 (or invalid) means stim's automatic layout.
+      const r = Number(msg.rows);
+      this.rows = Number.isInteger(r) && r > 0 ? r : 0;
       this.refresh();
     }
   }
@@ -139,7 +146,16 @@ export class StimPanel {
       }
 
       if (this.full && dependent) {
-        await this.refreshFull(text, type, tickMax, withoutNoise);
+        // One combined diagram of every tick, laid out in `rows` rows.
+        const svg = await renderDiagramFull(text, type, this.rows, withoutNoise);
+        this.panel.webview.postMessage({
+          command: "svg",
+          svg,
+          type,
+          tick: this.tick,
+          tickMax,
+          tickShown: false,
+        });
       } else {
         const svg = await renderDiagram(text, type, this.tick, withoutNoise);
         this.panel.webview.postMessage({
@@ -157,29 +173,6 @@ export class StimPanel {
         message: String(e?.message ?? e),
       });
     }
-  }
-
-  // Full mode: render one slice per tick (1..count_ticks), stacked in the
-  // webview. Ticks that fail to render for this diagram type are skipped.
-  private async refreshFull(
-    text: string,
-    type: DiagramType,
-    n: number,
-    withoutNoise: boolean
-  ) {
-    const items: { tick: number; svg: string }[] = [];
-    for (let t = 1; t <= n; t++) {
-      try {
-        const svg = await renderDiagram(text, type, t, withoutNoise);
-        items.push({ tick: t, svg });
-      } catch {
-        // Skip ticks that cannot be rendered for this diagram type.
-      }
-    }
-    if (items.length === 0) {
-      throw new Error("No renderable ticks for this diagram type.");
-    }
-    this.panel.webview.postMessage({ command: "svgList", type, items });
   }
 
   private dispose() {
@@ -215,10 +208,15 @@ export class StimPanel {
       <span class="switch-track"><span class="switch-knob"></span></span>
       <span class="switch-label">without noise</span>
     </button>
-    <button id="toggle-full" class="switch" aria-pressed="false" title="Show every tick stacked vertically (slice diagrams only)">
+    <button id="toggle-full" class="switch" aria-pressed="false" title="Show all ticks in one combined diagram (slice diagrams only)">
       <span class="switch-track"><span class="switch-knob"></span></span>
       <span class="switch-label">full</span>
     </button>
+    <span id="rows-control">
+      <label for="rows-input">rows</label>
+      <input id="rows-input" type="number" min="1" step="1" placeholder="auto"
+             title="Number of rows in the combined view (blank = automatic)" />
+    </span>
     <div id="tick-control">
       <div class="stepper">
         <button id="tick-prev" class="step" title="Previous tick (←)">◀</button>

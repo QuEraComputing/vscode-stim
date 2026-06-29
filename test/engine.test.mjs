@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { renderDiagram, countTicks, SVG_DIAGRAM_TYPES, TICK_DEPENDENT } from "../dist-test/stimEngine.js";
+import { renderDiagram, renderDiagramFull, countTicks, SVG_DIAGRAM_TYPES, TICK_DEPENDENT } from "../dist-test/stimEngine.js";
 
 const SAMPLE = "H 0\nTICK\nCX 0 1\nM 0 1\nDETECTOR rec[-1] rec[-2]\n";
 const NOISY = "H 0\nX_ERROR(0.1) 0\nTICK\nM 0\n";
@@ -44,4 +44,13 @@ test("countTicks counts TICK instructions", async () => {
   assert.strictEqual(await countTicks(SAMPLE), 1);
   assert.strictEqual(await countTicks("H 0\nTICK\nM 0\nTICK\n"), 2);
   assert.strictEqual(await countTicks("NOT_A_GATE 0"), -1);
+});
+
+test("renderDiagramFull combines all ticks and respects rows", async () => {
+  const multi = "R 0\nTICK\nH 0\nTICK\nM 0\nTICK\n";
+  const wide = await renderDiagramFull(multi, "timeslice-svg", 1, false);
+  const tall = await renderDiagramFull(multi, "timeslice-svg", 3, false);
+  assert.ok(wide.includes("<svg"));
+  const vb = (s) => /viewBox="[^"]*\s([\d.]+)\s+([\d.]+)"/.exec(s)[0];
+  assert.notStrictEqual(vb(wide), vb(tall));
 });

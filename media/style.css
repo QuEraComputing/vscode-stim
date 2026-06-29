@@ -113,6 +113,25 @@ body {
   opacity: 1;
 }
 
+/* Rows input for the combined full view. */
+#rows-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+#rows-control label {
+  opacity: 0.8;
+}
+#rows-input {
+  width: 52px;
+  padding: 3px 6px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+  border-radius: 4px;
+  font: inherit;
+}
+
 /* Tick stepper: < N > framed as one bordered element with dividers. */
 #tick-control {
   display: none;
@@ -189,13 +208,6 @@ body {
 .zoom-xform {
   transform-origin: 0 0;
   display: block;
-}
-.tick-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--vscode-foreground);
-  opacity: 0.8;
-  margin: 4px 2px;
 }
 .error {
   color: var(--vscode-errorForeground);

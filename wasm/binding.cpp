@@ -21,41 +21,72 @@ using namespace stim_draw_internal;
 // because C++ hex escapes greedily consume every following hex digit.
 static const std::string ERROR_PREFIX = "\x01" "ERROR" "\x01";
 
+// Render a diagram over a tick range into `out`. Slice diagrams (timeslice /
+// detslice / detslice-with-ops) honour [tick_start, tick_num) and lay multiple
+// ticks out in `num_rows` rows (0 = stim's automatic layout). Timeline always
+// covers the whole circuit; matchgraph ignores ticks.
+static void render_to(
+    const Circuit &circuit,
+    const std::string &type,
+    uint64_t tick_start,
+    uint64_t tick_num,
+    size_t num_rows,
+    std::ostream &out) {
+    std::vector<CoordFilter> filters;
+    filters.push_back(CoordFilter{});
+    SpanRef<const CoordFilter> coord_filter(filters);
+    if (type == "timeline-svg") {
+        DiagramTimelineSvgDrawer::make_diagram_write_to(
+            circuit, out, 0, UINT64_MAX,
+            DiagramTimelineSvgDrawerMode::SVG_MODE_TIMELINE, coord_filter, num_rows);
+    } else if (type == "timeslice-svg") {
+        DiagramTimelineSvgDrawer::make_diagram_write_to(
+            circuit, out, tick_start, tick_num,
+            DiagramTimelineSvgDrawerMode::SVG_MODE_TIME_SLICE, coord_filter, num_rows);
+    } else if (type == "detslice-with-ops-svg") {
+        DiagramTimelineSvgDrawer::make_diagram_write_to(
+            circuit, out, tick_start, tick_num,
+            DiagramTimelineSvgDrawerMode::SVG_MODE_TIME_DETECTOR_SLICE, coord_filter, num_rows);
+    } else if (type == "detslice-svg") {
+        DetectorSliceSet::from_circuit_ticks(circuit, tick_start, tick_num, coord_filter)
+            .write_svg_diagram_to(out, num_rows);
+    } else if (type == "matchgraph-svg") {
+        DetectorErrorModel dem = ErrorAnalyzer::circuit_to_detector_error_model(
+            circuit, false, true, false, 0, false, false);
+        dem_match_graph_to_svg_diagram_write_to(dem, out);
+    } else {
+        throw std::invalid_argument("Unknown diagram type: " + type);
+    }
+}
+
+// A single slice/diagram at one tick.
 static std::string diagram(std::string circuit_text, std::string type, int tick, bool without_noise) {
     try {
         Circuit circuit{std::string_view(circuit_text)};
         if (without_noise) {
             circuit = circuit.without_noise();
         }
-        std::vector<CoordFilter> filters;
-        filters.push_back(CoordFilter{});
-        SpanRef<const CoordFilter> coord_filter(filters);
         uint64_t tick_start = (uint64_t)(tick < 0 ? 0 : tick);
-        uint64_t tick_num = 1;
         std::ostringstream out;
-        if (type == "timeline-svg") {
-            DiagramTimelineSvgDrawer::make_diagram_write_to(
-                circuit, out, 0, UINT64_MAX,
-                DiagramTimelineSvgDrawerMode::SVG_MODE_TIMELINE, coord_filter);
-        } else if (type == "timeslice-svg") {
-            DiagramTimelineSvgDrawer::make_diagram_write_to(
-                circuit, out, tick_start, tick_num,
-                DiagramTimelineSvgDrawerMode::SVG_MODE_TIME_SLICE, coord_filter);
-        } else if (type == "detslice-with-ops-svg") {
-            DiagramTimelineSvgDrawer::make_diagram_write_to(
-                circuit, out, tick_start, tick_num,
-                DiagramTimelineSvgDrawerMode::SVG_MODE_TIME_DETECTOR_SLICE, coord_filter);
-        } else if (type == "detslice-svg") {
-            DetectorSliceSet::from_circuit_ticks(
-                circuit, tick_start, tick_num, coord_filter)
-                .write_svg_diagram_to(out);
-        } else if (type == "matchgraph-svg") {
-            DetectorErrorModel dem = ErrorAnalyzer::circuit_to_detector_error_model(
-                circuit, false, true, false, 0, false, false);
-            dem_match_graph_to_svg_diagram_write_to(dem, out);
-        } else {
-            throw std::invalid_argument("Unknown diagram type: " + type);
+        render_to(circuit, type, tick_start, 1, 0, out);
+        return out.str();
+    } catch (const std::exception &e) {
+        return ERROR_PREFIX + e.what();
+    } catch (...) {
+        return ERROR_PREFIX + std::string("unknown error generating diagram");
+    }
+}
+
+// The whole circuit's ticks in one diagram, laid out in `rows` rows (0 = auto).
+static std::string diagram_full(std::string circuit_text, std::string type, int rows, bool without_noise) {
+    try {
+        Circuit circuit{std::string_view(circuit_text)};
+        if (without_noise) {
+            circuit = circuit.without_noise();
         }
+        size_t num_rows = rows < 0 ? 0 : (size_t)rows;
+        std::ostringstream out;
+        render_to(circuit, type, 0, UINT64_MAX, num_rows, out);
         return out.str();
     } catch (const std::exception &e) {
         return ERROR_PREFIX + e.what();
@@ -77,5 +108,6 @@ static int count_ticks(std::string circuit_text) {
 
 EMSCRIPTEN_BINDINGS(stim_diagram) {
     function("diagram", &diagram);
+    function("diagram_full", &diagram_full);
     function("count_ticks", &count_ticks);
 }
