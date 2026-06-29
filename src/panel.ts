@@ -24,6 +24,18 @@ const TICK_DEPENDENT_BASES: BaseType[] = ["timeslice", "detslice"];
 // Bases that also have an interactive 3D form (the 2d|3d toggle).
 const DIM_CAPABLE_BASES: BaseType[] = ["timeline", "matchgraph"];
 
+// Persisted toolbar selections, restored when a new panel opens.
+const STATE_KEY = "stim.viewState";
+
+interface PersistedState {
+  base: BaseType;
+  threeD: boolean;
+  withOps: boolean;
+  withoutNoise: boolean;
+  full: boolean;
+  rows: number;
+}
+
 export class StimPanel {
   public static readonly viewType = "stim.visualizer";
   private static panels = new Map<string, StimPanel>();
@@ -67,6 +79,7 @@ export class StimPanel {
     private readonly context: vscode.ExtensionContext,
     private readonly doc: vscode.TextDocument
   ) {
+    this.loadState();
     this.panel.webview.html = this.getHtml();
     this.panel.webview.onDidReceiveMessage(
       (msg) => this.onMessage(msg),
@@ -74,6 +87,34 @@ export class StimPanel {
       this.disposables
     );
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+  }
+
+  // Restore the last-used toolbar selections (if any).
+  private loadState() {
+    const s = this.context.globalState.get<PersistedState>(STATE_KEY);
+    if (!s) {
+      return;
+    }
+    if (BASE_TYPES.some((b) => b.id === s.base)) {
+      this.base = s.base;
+    }
+    this.threeD = !!s.threeD;
+    this.withOps = !!s.withOps;
+    this.withoutNoise = !!s.withoutNoise;
+    this.full = !!s.full;
+    this.rows = Number.isInteger(s.rows) && s.rows > 0 ? s.rows : 0;
+  }
+
+  private saveState() {
+    const s: PersistedState = {
+      base: this.base,
+      threeD: this.threeD,
+      withOps: this.withOps,
+      withoutNoise: this.withoutNoise,
+      full: this.full,
+      rows: this.rows,
+    };
+    void this.context.globalState.update(STATE_KEY, s);
   }
 
   // Resolve the current stim diagram-type string from the UI state.
@@ -138,6 +179,11 @@ export class StimPanel {
       const r = Number(msg.rows);
       this.rows = Number.isInteger(r) && r > 0 ? r : 0;
       this.refresh();
+    }
+
+    // Persist toolbar selections (tick is per-circuit, so it's excluded).
+    if (typeof msg.command === "string" && msg.command.startsWith("set") && msg.command !== "setTick") {
+      this.saveState();
     }
   }
 
