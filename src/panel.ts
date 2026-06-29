@@ -519,7 +519,7 @@ export class StimPanel {
     </button>
     <button id="toggle-full" class="switch" aria-pressed="false" title="Show all ticks in one combined diagram (slice diagrams only)">
       <span class="switch-track"><span class="switch-knob"></span></span>
-      <span class="switch-label">full</span>
+      <span class="switch-label">all ticks</span>
     </button>
     <span id="rows-control">
       <label for="rows-input">rows</label>
