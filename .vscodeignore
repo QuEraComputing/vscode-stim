@@ -2,6 +2,9 @@
 src/**
 test/**
 third_party/**
+node_modules/**
+media/stim-logo-original.svg
+**/.DS_Store
 wasm/binding.cpp
 wasm/build-wasm.sh
 wasm/harness.mjs
