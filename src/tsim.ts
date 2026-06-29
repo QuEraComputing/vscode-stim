@@ -154,7 +154,7 @@ export function toPlaceholders(loweredText: string): Placeholders {
     if ((m = reRot.exec(line))) {
       const [, indent, axis, theta, targets] = m;
       const label = `R_${axis}`;
-      const annotation = `${parseFloat(theta)}π`; // θπ
+      const annotation = `${format4g(parseFloat(theta))}π`; // θπ, 4 significant figures
       for (const tgt of targets.split(/\s+/)) {
         const id = nextId();
         labels.push({ id, label, annotation });
@@ -180,6 +180,11 @@ export function toPlaceholders(loweredText: string): Placeholders {
 
 function escapeXml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Mirror Python's f"{x:.4g}": 4 significant figures, trailing zeros trimmed.
+function format4g(x: number): string {
+  return String(parseFloat(x.toPrecision(4)));
 }
 
 // Relabel a rendered SVG: each I_ERROR placeholder draws an "ERR" box followed

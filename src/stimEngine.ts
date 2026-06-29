@@ -46,6 +46,7 @@ interface StimModule {
     decomposeErrors: boolean
   ): string;
   count_ticks(text: string): number;
+  without_noise_text(text: string): string;
   circuit_stats_json(text: string): string;
   dem_diagram(text: string, type: string): string;
   dem_stats_json(text: string): string;
@@ -222,6 +223,16 @@ export async function getCircuitStats(circuitText: string): Promise<CircuitStats
     modulePromise = undefined;
     throw new Error(`stim failed to read circuit stats: ${String(e?.message ?? e)}`);
   }
+}
+
+// The circuit with all noise operations removed (gate tags preserved).
+export async function withoutNoiseText(circuitText: string): Promise<string> {
+  const mod = await loadModule();
+  const result = mod.without_noise_text(circuitText);
+  if (result.startsWith(ERROR_SENTINEL)) {
+    throw new Error(result.slice(ERROR_SENTINEL.length));
+  }
+  return result;
 }
 
 // Number of TICK instructions in the circuit (-1 if it cannot be parsed).

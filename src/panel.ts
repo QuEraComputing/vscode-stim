@@ -8,6 +8,7 @@ import {
   renderDiagramFull,
   renderDemDiagram,
   countTicks,
+  withoutNoiseText,
   getCircuitStats,
   getDemStats,
   getCircuitDemStats,
@@ -258,10 +259,12 @@ export class StimPanel {
     const relabel = type === "timeline-svg" || type === "timeslice-svg";
     // "without noise" only applies where the toggle is shown: not for the match
     // graph (built from the noise), and for detslice only with the ops overlay.
-    // The placeholder render uses X_ERROR markers, so noise stripping is off there.
     const noiseApplies =
       this.base !== "matchgraph" && !(this.base === "detslice" && !this.withOps);
-    const withoutNoise = relabel ? false : noiseApplies ? this.withoutNoise : false;
+    const wantNoiseStrip = noiseApplies && this.withoutNoise;
+    // On the relabel path the placeholders are themselves I_ERROR ops, so we
+    // strip noise from the circuit up front instead of during the render.
+    const withoutNoise = relabel ? false : wantNoiseStrip;
     try {
       // Slice diagrams index by tick. Clamp the requested tick to the valid
       // range [1, count_ticks]; out-of-range ticks make stim divide by zero.
@@ -277,8 +280,11 @@ export class StimPanel {
       }
 
       // For relabeled diagrams, render placeholders then swap them for gate
-      // labels; otherwise render the lowered circuit directly.
-      const ph = relabel ? toPlaceholders(text) : null;
+      // labels; otherwise render the lowered circuit directly. When "without
+      // noise" is on, strip noise from the circuit before making placeholders
+      // (the placeholders are noise ops themselves).
+      const baseText = relabel && wantNoiseStrip ? await withoutNoiseText(text) : text;
+      const ph = relabel ? toPlaceholders(baseText) : null;
       const src = ph ? ph.text : text;
       const finish = (svg: string) => (ph ? relabelSvg(svg, ph.labels) : svg);
 

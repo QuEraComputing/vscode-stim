@@ -254,6 +254,20 @@ static std::string gate_data_json() {
     return out;
 }
 
+// Returns the circuit text with all noise operations removed (stim's
+// Circuit::without_noise), preserving gate tags. Lets the tsim relabel path
+// strip user noise before inserting I_ERROR placeholders.
+static std::string without_noise_text(std::string circuit_text) {
+    try {
+        Circuit c{std::string_view(circuit_text)};
+        std::ostringstream out;
+        out << c.without_noise();
+        return out.str();
+    } catch (const std::exception &e) {
+        return ERROR_PREFIX + e.what();
+    }
+}
+
 // Returns the number of TICK instructions in the circuit, or -1 if the
 // circuit text cannot be parsed. Used to drive "full mode" (one slice per tick).
 static int count_ticks(std::string circuit_text) {
@@ -291,6 +305,7 @@ EMSCRIPTEN_BINDINGS(stim_diagram) {
     function("diagram", &diagram);
     function("diagram_full", &diagram_full);
     function("count_ticks", &count_ticks);
+    function("without_noise_text", &without_noise_text);
     function("circuit_stats_json", &circuit_stats_json);
     function("dem_diagram", &dem_diagram);
     function("dem_stats_json", &dem_stats_json);

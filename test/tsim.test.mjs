@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert";
 import { shorthandToStim, toPlaceholders, relabelSvg } from "../dist-test/tsim.js";
-import { renderDiagram } from "../dist-test/stimEngine.js";
+import { renderDiagram, withoutNoiseText } from "../dist-test/stimEngine.js";
 
 test("lowers tsim shorthand to tagged stim", () => {
   assert.match(shorthandToStim("T 0 1"), /S\[T\] 0 1/);
@@ -24,6 +24,17 @@ test("placeholders carry gate labels and annotations", () => {
   assert.ok(ph.labels.some((l) => l.label === "T"));
   assert.ok(ph.labels.some((l) => l.label === "R_X" && l.annotation === "0.5π"));
   assert.match(ph.text, /I_ERROR\(/);
+});
+
+test("rotation angle is rounded to 4 significant figures", () => {
+  const ph = toPlaceholders(shorthandToStim("R_X(0.333333) 0"));
+  assert.ok(ph.labels.some((l) => l.annotation === "0.3333π"));
+});
+
+test("withoutNoiseText strips noise but keeps tsim gates", async () => {
+  const out = await withoutNoiseText(shorthandToStim("T 0\nX_ERROR(0.1) 0\n"));
+  assert.match(out, /S\[T\] 0/);
+  assert.ok(!out.includes("X_ERROR"));
 });
 
 test("relabel restores gate names in the rendered svg", async () => {
