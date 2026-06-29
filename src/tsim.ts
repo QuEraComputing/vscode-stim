@@ -1,23 +1,28 @@
 // Support for tsim's non-Clifford gates (T, TPP, R_X/Y/Z, R_XX/YY/ZZ, R_PAULI,
-// U3, CCZ, CCX). Ported from tsim's utils/program_text.py and utils/diagram.py.
+// U3, CCZ, CCX). Translated from tsim's utils/program_text.py and
+// utils/diagram.py.
 //
 // Pipeline (visualization only):
 //   1. shorthandToStim:  T 0 1            -> S[T] 0 1            (valid stim)
 //   2. toPlaceholders:   S[T] 0 1         -> I_ERROR(id) 0 ...   (+ label map)
+//                        SPP[T] X0*Y1     -> SPP X0*X0*Y1*Y1     (doubled)
 //   3. stim renders the placeholder circuit (boxes with a red id text)
-//   4. relabelSvg (webview): swap the placeholder boxes back to T / R_X / ...
+//   4. relabelSvg:       I_ERROR boxes    -> T / R_X / U3 / ... ; doubled SPP -> TPP
 //
-// Steps 1-2 run in the extension host; step 4 runs in the webview (it needs a
-// DOM). Simulation-backed views still use the step-1 output, so T behaves as S,
-// R_Z as identity, etc. (the documented Clifford approximation).
+// Simulation-backed views use the step-1 output, so T behaves as S, R_Z as
+// identity, etc. (the documented Clifford approximation).
+
+import { DOMParser, XMLSerializer } from "@xmldom/xmldom";
 
 const FLOAT = "[-+]?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][-+]?\\d+)?";
+const SVG_NS = "http://www.w3.org/2000/svg";
 
 function encodeTTag(userTag: string): string {
   return userTag ? `T:${userTag}` : "T";
 }
 
-// CCZ/CCX -> Clifford+T decomposition (matches tsim's controlled_gate_decomposition_lines).
+// --- shorthand -> stim (port of program_text.py:shorthand_to_stim) -----------
+
 function controlledDecomposition(
   gate: "CCZ" | "CCX",
   a: string,
@@ -81,12 +86,10 @@ function expandControlledGates(text: string): string {
 // Convert tsim shorthand to valid stim (tagged Clifford stand-ins).
 export function shorthandToStim(text: string): string {
   text = expandControlledGates(text);
-  // TPP before T to avoid partial matches; (?<!\[) avoids matching inside [T].
   text = text.replace(/(?<!\[)\bTPP_DAG(?:\[([^\]\n]*)\])?(?!\w)/g, (_m, u) => `SPP_DAG[${encodeTTag(u || "")}]`);
   text = text.replace(/(?<!\[)\bTPP(?:\[([^\]\n]*)\])?(?!\w)/g, (_m, u) => `SPP[${encodeTTag(u || "")}]`);
   text = text.replace(/(?<!\[)\bT_DAG(?:\[([^\]\n]*)\])?(?!\w)/g, (_m, u) => `S_DAG[${encodeTTag(u || "")}]`);
   text = text.replace(/(?<!\[)\bT(?:\[([^\]\n]*)\])?(?!\w)/g, (_m, u) => `S[${encodeTTag(u || "")}]`);
-
   text = text.replace(
     new RegExp(`\\bR_([XYZ])\\1\\((${FLOAT})\\)\\s+(\\d+)\\s+(\\d+)`, "g"),
     (_m, p, a, q0, q1) => {
@@ -110,29 +113,57 @@ export function shorthandToStim(text: string): string {
   return text;
 }
 
-export interface PlaceholderLabel {
-  id: number;
-  label: string;
+// --- placeholders + relabel (port of diagram.py) -----------------------------
+
+export interface GateLabel {
+  label: string; // may contain SVG markup (tspans)
   annotation?: string;
+}
+
+function subscript(text: string): string {
+  return `<tspan baseline-shift="sub" font-size="14">${text}</tspan>`;
+}
+const DAGGER = '<tspan baseline-shift="super" font-size="14">†</tspan>';
+
+// Mirror Python's f"{x:.4g}": 4 significant figures, trailing zeros trimmed.
+function format4g(x: number): string {
+  return String(parseFloat(x.toPrecision(4)));
+}
+
+// Parse a parametric gate tag like "R_Z(theta=0.3*pi)" -> ["R_Z", {theta: 0.3}].
+export function parseParametricTag(
+  tag: string
+): [string, Record<string, number>] | null {
+  const m = /^(\w+)\((.*)\)$/.exec(tag);
+  if (!m) return null;
+  const gateName = m[1];
+  const params: Record<string, number> = {};
+  for (const raw of m[2].split(",")) {
+    const param = raw.trim();
+    if (!param) continue;
+    const pm = new RegExp(`^(\\w+)=(${FLOAT})\\*pi$`).exec(param);
+    if (!pm) return null;
+    params[pm[1]] = parseFloat(pm[2]);
+  }
+  return [gateName, params];
 }
 
 export interface Placeholders {
   text: string;
-  labels: PlaceholderLabel[];
+  labels: Map<number, GateLabel>;
 }
 
-// Replace single-qubit tsim gates (T-family, rotations, U3) with I_ERROR(id)
-// markers, one per qubit, to be relabeled later. Pauli-product gates
-// (TPP/R_XX/R_PAULI, which lower to SPP[...]) pass through and render as their
-// SPP box; stim ignores the tag when drawing.
+// Rewrite tagged tsim gates into drawable placeholders. Single-qubit gates
+// (T-family, rotations, U3) become I_ERROR(id) markers (one per qubit) with a
+// label; Pauli-product TPP doubles its targets so the SVG yields duplicate SPP
+// boxes that the de-dup step renames to TPP.
 export function toPlaceholders(loweredText: string): Placeholders {
-  const labels: PlaceholderLabel[] = [];
+  const labels = new Map<number, GateLabel>();
   let counter = 0;
-  // Distinct 6-decimal ids in [0.001, 0.9), spaced so the rendered probability
-  // round-trips back to a unique value when matched numerically.
   const nextId = () => Math.round((0.001 + ++counter * 1e-6) * 1e6) / 1e6;
 
   const reT = /^(\s*)(S|S_DAG)\[(T(?::[^\]\n]*)?)\]\s+(.+?)\s*$/;
+  const reTpp = /^(\s*)(SPP|SPP_DAG)\[(T(?::[^\]\n]*)?)\]\s+(.+?)\s*$/;
   const reRot = new RegExp(`^(\\s*)I\\[R_([XYZ])\\(theta=(${FLOAT})\\*pi\\)\\]\\s+(.+?)\\s*$`);
   const reU3 = /^(\s*)I\[U3\([^\]]*\)\]\s+(.+?)\s*$/;
 
@@ -142,10 +173,10 @@ export function toPlaceholders(loweredText: string): Placeholders {
 
     if ((m = reT.exec(line))) {
       const [, indent, name, , targets] = m;
-      const label = name === "S_DAG" ? "T†" : "T"; // T†
+      const label: GateLabel = { label: name === "S_DAG" ? "T" + DAGGER : "T" };
       for (const tgt of targets.split(/\s+/)) {
         const id = nextId();
-        labels.push({ id, label });
+        labels.set(id, label);
         out.push(`${indent}I_ERROR(${id}) ${tgt}`);
       }
       continue;
@@ -153,11 +184,13 @@ export function toPlaceholders(loweredText: string): Placeholders {
 
     if ((m = reRot.exec(line))) {
       const [, indent, axis, theta, targets] = m;
-      const label = `R_${axis}`;
-      const annotation = `${format4g(parseFloat(theta))}π`; // θπ, 4 significant figures
+      const label: GateLabel = {
+        label: "R" + subscript(axis),
+        annotation: `${format4g(parseFloat(theta))}π`,
+      };
       for (const tgt of targets.split(/\s+/)) {
         const id = nextId();
-        labels.push({ id, label, annotation });
+        labels.set(id, label);
         out.push(`${indent}I_ERROR(${id}) ${tgt}`);
       }
       continue;
@@ -165,11 +198,24 @@ export function toPlaceholders(loweredText: string): Placeholders {
 
     if ((m = reU3.exec(line))) {
       const [, indent, targets] = m;
+      const label: GateLabel = { label: "U" + subscript("3") };
       for (const tgt of targets.split(/\s+/)) {
         const id = nextId();
-        labels.push({ id, label: "U3" });
+        labels.set(id, label);
         out.push(`${indent}I_ERROR(${id}) ${tgt}`);
       }
+      continue;
+    }
+
+    if ((m = reTpp.exec(line))) {
+      // Double each Pauli target so stim draws overlapping boxes the de-dup
+      // step collapses and renames SPP -> TPP.
+      const [, indent, name, , product] = m;
+      const doubled = product
+        .split("*")
+        .map((p) => `${p}*${p}`)
+        .join("*");
+      out.push(`${indent}${name} ${doubled}`);
       continue;
     }
 
@@ -178,36 +224,136 @@ export function toPlaceholders(loweredText: string): Placeholders {
   return { text: out.join("\n"), labels };
 }
 
-function escapeXml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
+// --- tiny DOM helpers over @xmldom/xmldom ------------------------------------
 
-// Mirror Python's f"{x:.4g}": 4 significant figures, trailing zeros trimmed.
-function format4g(x: number): string {
-  return String(parseFloat(x.toPrecision(4)));
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function parseSvg(svg: string): any {
+  return new DOMParser().parseFromString(svg, "text/xml");
 }
-
-// Relabel a rendered SVG: each I_ERROR placeholder draws an "ERR" box followed
-// by a red probability text (the id). Swap the box text for the gate label, and
-// either turn the red id into the gate's annotation or drop it. Mirrors tsim's
-// placeholders_to_t, done with regex on the SVG string.
-export function relabelSvg(svg: string, labels: PlaceholderLabel[]): string {
-  const used = new Set<PlaceholderLabel>();
-  const pair =
-    /(<text\b[^>]*>)ERR(?:<tspan[^>]*>[^<]*<\/tspan>)?(<\/text>)\s*(<text\b[^>]*\bstroke="red"[^>]*>)([0-9.eE+-]+)(<\/text>)/g;
-  let out = svg.replace(pair, (full, errOpen, errClose, redOpen, idStr, redClose) => {
-    const id = parseFloat(idStr);
-    const lab = labels.find((l) => !used.has(l) && Math.abs(l.id - id) < 4e-7);
-    if (!lab) {
-      return full;
-    }
-    used.add(lab);
-    const newErr = `${errOpen}${escapeXml(lab.label)}${errClose}`;
-    if (lab.annotation) {
-      const open = redOpen.replace(/\s*stroke="red"/, ' fill="black"');
-      return `${newErr}${open}${escapeXml(lab.annotation)}${redClose}`;
-    }
-    return newErr;
-  });
+function serialize(doc: any): string {
+  return new XMLSerializer().serializeToString(doc);
+}
+function localName(el: any): string {
+  return el.localName || el.tagName;
+}
+function childElements(parent: any): any[] {
+  const out: any[] = [];
+  for (let n = parent.firstChild; n; n = n.nextSibling) {
+    if (n.nodeType === 1) out.push(n);
+  }
   return out;
+}
+function previousElement(node: any): any {
+  for (let n = node.previousSibling; n; n = n.previousSibling) {
+    if (n.nodeType === 1) return n;
+  }
+  return null;
+}
+function allElements(root: any, tag: string): any[] {
+  const list = root.getElementsByTagName(tag);
+  const out: any[] = [];
+  for (let i = 0; i < list.length; i++) out.push(list.item(i));
+  return out;
+}
+function clearChildren(el: any): void {
+  while (el.firstChild) el.removeChild(el.firstChild);
+}
+
+// An ERR text box is an I_ERROR placeholder: contains <tspan>I</tspan>.
+function isErrElement(el: any): boolean {
+  if (!el || localName(el) !== "text") return false;
+  for (const child of childElements(el)) {
+    if (localName(child) === "tspan" && child.textContent === "I") return true;
+  }
+  return false;
+}
+
+// Replace each I_ERROR placeholder box with its gate label, and turn the red id
+// text into the annotation (or remove it). Port of diagram.py:placeholders_to_t.
+export function placeholdersToT(svg: string, labels: Map<number, GateLabel>): string {
+  const doc = parseSvg(svg);
+  const redTexts = allElements(doc, "text").filter(
+    (el) => el.getAttribute("stroke") === "red" && el.textContent
+  );
+
+  const replacements: Array<{ red: any; err: any; gate: GateLabel }> = [];
+  for (const [id, gate] of labels) {
+    for (const red of redTexts) {
+      const val = parseFloat(red.textContent);
+      if (Number.isFinite(val) && Math.abs(val - id) < 4e-7) {
+        const err = previousElement(red);
+        if (isErrElement(err)) {
+          replacements.push({ red, err, gate });
+        }
+        break;
+      }
+    }
+  }
+
+  for (const { red, err, gate } of replacements) {
+    err.setAttribute("dominant-baseline", "central");
+    err.setAttribute("text-anchor", "middle");
+    err.setAttribute("font-family", "monospace");
+    err.setAttribute("font-size", "30");
+    clearChildren(err);
+    if (gate.label.includes("<")) {
+      const frag = parseSvg(`<root xmlns="${SVG_NS}">${gate.label}</root>`).documentElement;
+      for (let n = frag.firstChild; n; n = n.nextSibling) {
+        err.appendChild(err.ownerDocument.importNode(n, true));
+      }
+    } else {
+      err.appendChild(err.ownerDocument.createTextNode(gate.label));
+    }
+    if (gate.annotation === undefined) {
+      if (red.parentNode) red.parentNode.removeChild(red);
+    } else {
+      clearChildren(red);
+      red.appendChild(red.ownerDocument.createTextNode(gate.annotation));
+      red.setAttribute("stroke", "black");
+    }
+  }
+  return serialize(doc);
+}
+
+// Collapse the doubled SPP boxes from a TPP placeholder and rename SPP -> TPP.
+// Port of diagram.py:_deduplicate_doubled_spp.
+export function deduplicateDoubledSpp(svg: string): string {
+  const doc = parseSvg(svg);
+  const root = doc.documentElement;
+  const kids = childElements(root);
+  const toRemove: any[] = [];
+  const toRename: any[] = [];
+
+  let i = 0;
+  while (i < kids.length - 3) {
+    const [r1, t1, r2, t2] = [kids[i], kids[i + 1], kids[i + 2], kids[i + 3]];
+    if (
+      localName(r1) === "rect" && r1.getAttribute("fill") === "black" &&
+      localName(t1) === "text" && t1.getAttribute("fill") === "white" &&
+      localName(r2) === "rect" && r2.getAttribute("fill") === "black" &&
+      localName(t2) === "text" && t2.getAttribute("fill") === "white" &&
+      r1.getAttribute("x") === r2.getAttribute("x") &&
+      r1.getAttribute("y") === r2.getAttribute("y")
+    ) {
+      toRemove.push(r2, t2);
+      toRename.push(t1);
+      i += 4;
+    } else {
+      i += 1;
+    }
+  }
+
+  for (const el of toRemove) root.removeChild(el);
+  for (const t of toRename) {
+    const first = t.firstChild;
+    if (first && first.nodeType === 3 && first.data) {
+      first.data = first.data.replace("SPP", "TPP");
+    }
+  }
+  return serialize(doc);
+}
+
+// Full relabel: placeholders -> gate labels, then collapse doubled SPP -> TPP.
+export function relabelSvg(svg: string, labels: Map<number, GateLabel>): string {
+  return deduplicateDoubledSpp(placeholdersToT(svg, labels));
 }
