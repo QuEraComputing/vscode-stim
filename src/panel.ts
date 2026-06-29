@@ -117,27 +117,34 @@ export class StimPanel {
     void this.context.globalState.update(STATE_KEY, s);
   }
 
+  private isDimCapable(): boolean {
+    return DIM_CAPABLE_BASES.includes(this.base);
+  }
+
+  // 3D is only meaningful for bases that have a 3D form; the remembered flag is
+  // ignored elsewhere. This keeps the stale flag from leaking into other bases.
+  private effectiveThreeD(): boolean {
+    return this.threeD && this.isDimCapable();
+  }
+
   // Resolve the current stim diagram-type string from the UI state.
   private currentType(): DiagramType {
     switch (this.base) {
       case "timeline":
-        return this.threeD ? "timeline-3d-html" : "timeline-svg";
+        return this.effectiveThreeD() ? "timeline-3d-html" : "timeline-svg";
       case "timeslice":
         return "timeslice-svg";
       case "detslice":
         return this.withOps ? "detslice-with-ops-svg" : "detslice-svg";
       case "matchgraph":
-        return this.threeD ? "matchgraph-3d-html" : "matchgraph-svg";
+        return this.effectiveThreeD() ? "matchgraph-3d-html" : "matchgraph-svg";
     }
   }
 
-  private isDimCapable(): boolean {
-    return DIM_CAPABLE_BASES.includes(this.base);
-  }
-
-  // 3D types are whole-circuit, not per-tick.
+  // Tick-dependent bases (timeslice, detslice) are disjoint from the 3D-capable
+  // ones, so this never needs to consult the 3D flag.
   private isTickDependent(): boolean {
-    return TICK_DEPENDENT_BASES.includes(this.base) && !this.threeD;
+    return TICK_DEPENDENT_BASES.includes(this.base);
   }
 
   private onMessage(msg: any) {

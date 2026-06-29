@@ -29,12 +29,15 @@
     rows: 0,
   };
 
-  // 3D types are whole-circuit, so they're never tick-dependent.
-  function isTickDependent() {
-    return state.tickDependentBases.includes(state.base) && state.dim !== "3d";
-  }
   function isDimCapable() {
     return state.dimCapableBases.includes(state.base);
+  }
+  // Tick-dependent bases (timeslice, detslice) are disjoint from the 3D-capable
+  // ones (timeline, matchgraph), so this never needs to consult the dim state.
+  // The 2d|3d toggle only shows for dim-capable bases, so a remembered "3d" can
+  // never suppress the tick/full controls on a slice base.
+  function isTickDependent() {
+    return state.tickDependentBases.includes(state.base);
   }
 
   function setPressed(btn, on) {
