@@ -61,8 +61,9 @@ body {
   font-family: inherit;
 }
 .switch-track {
-  width: 30px;
-  height: 16px;
+  box-sizing: border-box;
+  width: 32px;
+  height: 18px;
   border-radius: 999px;
   background: var(--vscode-checkbox-background, #3c3c3c);
   border: 1px solid var(--vscode-checkbox-border, transparent);
@@ -72,8 +73,8 @@ body {
 }
 .switch-knob {
   position: absolute;
-  top: 1px;
-  left: 1px;
+  top: 2px;
+  left: 2px;
   width: 12px;
   height: 12px;
   border-radius: 50%;
@@ -86,39 +87,37 @@ body {
   border-color: var(--vscode-button-background);
 }
 .switch[aria-pressed="true"] .switch-knob {
-  left: 15px;
+  left: 16px;
   background: var(--vscode-button-foreground);
   opacity: 1;
 }
 
-/* Tick stepper. */
+/* Tick stepper: < N > framed as one bordered element with dividers. */
 #tick-control {
   display: none;
   align-items: center;
-  gap: 4px;
 }
 #tick-control.visible {
   display: inline-flex;
 }
-.tick-readout {
-  font-size: inherit;
-}
-#tick-value {
-  display: inline-block;
-  min-width: 16px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
+.stepper {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+  overflow: hidden;
 }
 .step {
-  border: 1px solid var(--vscode-panel-border);
+  border: none;
   background: var(--vscode-button-secondaryBackground);
   color: var(--vscode-button-secondaryForeground);
-  width: 22px;
-  height: 22px;
-  border-radius: 4px;
+  width: 24px;
   cursor: pointer;
-  line-height: 1;
   font-size: 10px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .step:hover:not(:disabled) {
   background: var(--vscode-button-secondaryHoverBackground);
@@ -126,6 +125,18 @@ body {
 .step:disabled {
   opacity: 0.4;
   cursor: default;
+}
+.step-value {
+  min-width: 26px;
+  padding: 3px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  border-left: 1px solid var(--vscode-panel-border);
+  border-right: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-editor-background);
 }
 
 #view {

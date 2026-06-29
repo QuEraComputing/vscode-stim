@@ -51,6 +51,8 @@
     // "with ops" only applies to detslice.
     opsBtn.style.display = state.base === "detslice" ? "" : "none";
     setPressed(opsBtn, state.withOps);
+    // "without noise" is meaningless for the match graph (built from the noise).
+    noiseBtn.style.display = state.base === "matchgraph" ? "none" : "";
     setPressed(noiseBtn, state.withoutNoise);
     // Full mode only applies to slice (tick-dependent) types.
     fullBtn.style.display = dependent ? "" : "none";

@@ -208,9 +208,11 @@ export class StimPanel {
       <span class="switch-label">full</span>
     </button>
     <div id="tick-control">
-      <button id="tick-prev" class="step" title="Previous tick (←)">◀</button>
-      <span class="tick-readout">tick <span id="tick-value">1</span></span>
-      <button id="tick-next" class="step" title="Next tick (→)">▶</button>
+      <div class="stepper">
+        <button id="tick-prev" class="step" title="Previous tick (←)">◀</button>
+        <span id="tick-value" class="step-value">1</span>
+        <button id="tick-next" class="step" title="Next tick (→)">▶</button>
+      </div>
     </div>
   </div>
   <div id="view"></div>
