@@ -117,9 +117,12 @@ export class StimPanel {
     const text = this.doc.getText();
     const type = this.currentType();
     const dependent = this.isTickDependent();
-    // The match graph is built from the circuit's noise, so always render it
-    // with noise even if the (hidden) "without noise" toggle was left on.
-    const withoutNoise = this.base === "matchgraph" ? false : this.withoutNoise;
+    // "without noise" only applies where the toggle is shown: not for the match
+    // graph (built from the noise), and for detslice only with the ops overlay.
+    // Force it off elsewhere so a remembered value isn't silently applied.
+    const noiseApplies =
+      this.base !== "matchgraph" && !(this.base === "detslice" && !this.withOps);
+    const withoutNoise = noiseApplies ? this.withoutNoise : false;
     try {
       // Slice diagrams index by tick. Clamp the requested tick to the valid
       // range [1, count_ticks]; out-of-range ticks make stim divide by zero.

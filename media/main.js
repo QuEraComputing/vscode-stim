@@ -51,8 +51,11 @@
     // "with ops" only applies to detslice.
     opsBtn.style.display = state.base === "detslice" ? "" : "none";
     setPressed(opsBtn, state.withOps);
-    // "without noise" is meaningless for the match graph (built from the noise).
-    noiseBtn.style.display = state.base === "matchgraph" ? "none" : "";
+    // "without noise" shows for timeline/timeslice, and for detslice only when
+    // operations are overlaid. It's meaningless for the match graph.
+    const noiseVisible =
+      state.base !== "matchgraph" && !(state.base === "detslice" && !state.withOps);
+    noiseBtn.style.display = noiseVisible ? "" : "none";
     setPressed(noiseBtn, state.withoutNoise);
     // Full mode only applies to slice (tick-dependent) types.
     fullBtn.style.display = dependent ? "" : "none";
@@ -113,10 +116,14 @@
   // Wrap a raw SVG string in a zoomable, scrollable container. Ctrl/Cmd + wheel
   // (and trackpad pinch, which the browser reports as ctrl+wheel) zooms toward
   // the cursor; plain scroll pans. Ported from the tsim wrap_svg_zoomable helper.
-  function makeZoomable(svgString, height) {
+  // opts: { fill } to fill the panel (fit the whole SVG into the available
+  // area, used for the single view) or { height } for a fixed-height box
+  // (used for each item in full mode).
+  function makeZoomable(svgString, opts) {
+    opts = opts || {};
     const wrap = document.createElement("div");
-    wrap.className = "zoom-wrap";
-    wrap.style.height = height + "px";
+    wrap.className = "zoom-wrap" + (opts.fill ? " fill" : "");
+    if (!opts.fill) wrap.style.height = (opts.height || 700) + "px";
 
     const sizer = document.createElement("div");
     sizer.className = "zoom-sizer";
@@ -144,7 +151,7 @@
     xform.style.width = natW + "px";
     xform.style.height = natH + "px";
 
-    let scale = natH > 0 ? height / natH : 1;
+    let scale = 1;
 
     function apply() {
       xform.style.transform = "scale(" + scale + ")";
@@ -152,15 +159,22 @@
       sizer.style.height = natH * scale + "px";
     }
 
-    // Fit to the container width once it has been laid out.
-    requestAnimationFrame(() => {
+    // Fit once the container has been laid out: fill mode fits the whole SVG
+    // into the available area (so wide diagrams span the full width); fixed
+    // mode fits to the given height, capped to the container width.
+    function fit() {
       const cw = wrap.clientWidth;
-      if (cw > 0 && natW > 0) {
-        scale = Math.min(scale, cw / natW);
-        apply();
+      const ch = wrap.clientHeight;
+      if (cw <= 0 || natW <= 0 || natH <= 0) return;
+      if (opts.fill) {
+        scale = Math.min(cw / natW, ch / natH);
+      } else {
+        scale = Math.min((opts.height || 700) / natH, cw / natW);
       }
-    });
+      apply();
+    }
     apply();
+    requestAnimationFrame(fit);
 
     wrap.addEventListener(
       "wheel",
@@ -185,7 +199,7 @@
   }
 
   function showSingle(svg) {
-    view.replaceChildren(makeZoomable(svg, 700));
+    view.replaceChildren(makeZoomable(svg, { fill: true }));
   }
 
   function showList(items) {
@@ -195,7 +209,7 @@
       label.className = "tick-label";
       label.textContent = "tick " + item.tick;
       frag.appendChild(label);
-      frag.appendChild(makeZoomable(item.svg, 360));
+      frag.appendChild(makeZoomable(item.svg, { height: 360 }));
     }
     view.replaceChildren(frag);
   }

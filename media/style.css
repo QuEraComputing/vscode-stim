@@ -1,9 +1,15 @@
+html, body {
+  height: 100%;
+}
 body {
   margin: 0;
   font-family: var(--vscode-font-family);
   font-size: var(--vscode-font-size, 13px);
   color: var(--vscode-foreground);
   background: var(--vscode-editor-background);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 #toolbar {
   display: flex;
@@ -140,7 +146,10 @@ body {
 }
 
 #view {
+  flex: 1;
+  min-height: 0;
   padding: 12px;
+  overflow: auto;
 }
 
 /* Zoomable SVG container: scroll to pan, Ctrl/Cmd + wheel (or pinch) to zoom.
@@ -152,6 +161,11 @@ body {
   border-radius: 4px;
   position: relative;
   margin-bottom: 14px;
+}
+/* Single-view container fills the panel area below the toolbar. */
+.zoom-wrap.fill {
+  height: 100%;
+  margin-bottom: 0;
 }
 .zoom-sizer {
   display: inline-block;
