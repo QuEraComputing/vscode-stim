@@ -9,5 +9,7 @@ esbuild.js
 tsconfig.json
 docs/**
 useful_files/**
+dist-test/**
+.git*
 e2e_tmp.mjs
 **/*.map
