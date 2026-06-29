@@ -8,6 +8,7 @@
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Programming Languages", "Visualization"],
   "main": "./dist/extension.js",
+  "activationEvents": ["onLanguage:stim"],
   "contributes": {
     "languages": [
       {

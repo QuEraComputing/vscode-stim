@@ -23,6 +23,14 @@ interface StimModule {
   diagram(text: string, type: string, tick: number, withoutNoise: boolean): string;
   diagram_full(text: string, type: string, rows: number, withoutNoise: boolean): string;
   count_ticks(text: string): number;
+  gate_data_json(): string;
+}
+
+export interface GateInfo {
+  name: string;
+  category: string;
+  args: number;
+  help: string;
 }
 
 let modulePromise: Promise<StimModule> | undefined;
@@ -85,6 +93,22 @@ export async function renderDiagramFull(
     throw new Error(result.slice(ERROR_SENTINEL.length));
   }
   return result;
+}
+
+// stim's full gate/annotation table (names, categories, help), loaded once.
+// Drives editor autocomplete. Cached because it never changes for a build.
+let gateDataPromise: Promise<GateInfo[]> | undefined;
+
+export async function getGateData(): Promise<GateInfo[]> {
+  if (!gateDataPromise) {
+    gateDataPromise = loadModule()
+      .then((mod) => JSON.parse(mod.gate_data_json()) as GateInfo[])
+      .catch((e) => {
+        gateDataPromise = undefined;
+        throw e;
+      });
+  }
+  return gateDataPromise;
 }
 
 // Number of TICK instructions in the circuit (-1 if it cannot be parsed).

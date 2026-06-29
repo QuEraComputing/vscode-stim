@@ -54,4 +54,15 @@ assert.ok(vb(fullAuto) && vb(fullRow1), "diagram_full svgs should have viewBox")
 assert.notStrictEqual(vb(fullAuto)[0], vb(fullRow1)[0], "rows should change the layout");
 console.log("OK diagram_full");
 
+// gate_data_json: parseable list including common gates/annotations.
+const gates = JSON.parse(Module.gate_data_json());
+assert.ok(Array.isArray(gates) && gates.length > 20, "expected a gate list");
+const gnames = gates.map((g) => g.name);
+for (const n of ["H", "CX", "M", "DETECTOR", "TICK"]) {
+  assert.ok(gnames.includes(n), `gate_data missing ${n}`);
+}
+const cx = gates.find((g) => g.name === "CX");
+assert.ok(cx.help.length > 0 && typeof cx.category === "string", "gate entries need help/category");
+console.log(`OK gate_data_json (${gates.length} gates)`);
+
 console.log("ALL WASM CHECKS PASSED");
