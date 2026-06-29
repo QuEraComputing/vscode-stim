@@ -161,7 +161,7 @@
   tickNext.addEventListener("click", () => setTick(state.tick + 1));
   function setTick(t) {
     let next = Math.floor(t);
-    if (!Number.isFinite(next) || next < 1) next = 1;
+    if (!Number.isFinite(next) || next < 0) next = 0;
     if (state.tickMax > 0) next = Math.min(next, state.tickMax);
     const changed = next !== state.tick;
     state.tick = next;
@@ -189,7 +189,7 @@
   });
 
   function updateTickButtons() {
-    tickPrev.disabled = state.tick <= 1;
+    tickPrev.disabled = state.tick <= 0;
     tickNext.disabled = state.tickMax > 0 && state.tick >= state.tickMax;
   }
 
@@ -213,7 +213,7 @@
     } else if (e.key === "ArrowLeft" || key === "q") {
       setTick(state.tick - (e.shiftKey ? 5 : 1));
     } else if (e.key === "Home") {
-      jumpTick(1);
+      jumpTick(0);
     } else if (e.key === "End") {
       jumpTick(last);
     } else {

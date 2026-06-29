@@ -68,7 +68,7 @@ export class StimPanel {
   private threeD = false; // timeline/matchgraph: interactive 3D viewer
   private approxDisjoint = true; // matchgraph: approximate_disjoint_errors
   private decomposeErrors = false; // matchgraph: split hyperedges into pairs
-  private tick = 1;
+  private tick = 0; // slice index; stim ticks are 0-based (0 = first layer)
   private rows = 0; // full mode: layout rows (0 = stim auto)
   private disposables: vscode.Disposable[] = [];
 
@@ -266,17 +266,16 @@ export class StimPanel {
     // strip noise from the circuit up front instead of during the render.
     const withoutNoise = relabel ? false : wantNoiseStrip;
     try {
-      // Slice diagrams index by tick. Clamp the requested tick to the valid
-      // range [1, count_ticks]; out-of-range ticks make stim divide by zero.
+      // Slice diagrams index by tick. stim ticks are 0-based, so a circuit with
+      // N TICKs has slices 0..N (N+1 layers). Clamp to [0, count_ticks]; tick
+      // count_ticks+1 makes stim divide by zero.
       let tickMax = 0;
       if (dependent) {
         tickMax = await countTicks(text);
-        if (tickMax <= 0) {
-          throw new Error(
-            "Circuit has no TICK instructions; slice diagrams are unavailable."
-          );
+        if (tickMax < 0) {
+          throw new Error("Circuit could not be parsed.");
         }
-        this.tick = Math.min(Math.max(1, this.tick), tickMax);
+        this.tick = Math.min(Math.max(0, this.tick), tickMax);
       }
 
       // For relabeled diagrams, render placeholders then swap them for gate
@@ -529,8 +528,8 @@ export class StimPanel {
     <div id="tick-control">
       <div class="stepper">
         <button id="tick-prev" class="step" title="Previous layer (← or q; shift+q = −5, home = first)">◀</button>
-        <input id="tick-value" class="step-value" type="number" min="1" step="1" value="1"
-               aria-label="Current layer" title="Layer number — type to jump (clamped to range)" />
+        <input id="tick-value" class="step-value" type="number" min="0" step="1" value="0"
+               aria-label="Current layer" title="Layer number (0-based) — type to jump (clamped to range)" />
         <button id="tick-next" class="step" title="Next layer (→ or e; shift+e = +5, end = last)">▶</button>
       </div>
     </div>
