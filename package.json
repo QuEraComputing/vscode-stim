@@ -1,7 +1,7 @@
 {
-  "name": "stim-vscode",
+  "name": "vscode-stim",
   "displayName": "Stim",
-  "description": "Syntax highlighting and circuit visualization for stim files",
+  "description": "Syntax highlighting and circuit visualization for .stim and .dem files",
   "version": "0.0.1",
   "publisher": "local",
   "author": "Rafael Haenel",
@@ -14,7 +14,7 @@
   "bugs": {
     "url": "https://github.com/CHANGEME/stim-vscode/issues"
   },
-  "icon": "icon.png",
+  "icon": "media/vscode-stim.png",
   "engines": {
     "vscode": "^1.85.0"
   },
