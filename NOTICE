@@ -1,0 +1,19 @@
+Stim for VS Code
+Copyright (c) 2026 Rafael Haenel
+
+This product bundles a WebAssembly build of Stim in wasm/out/.
+
+Stim
+  https://github.com/quantumlib/Stim
+  Copyright The Stim authors and Google LLC
+  Licensed under the Apache License, Version 2.0.
+  The source is vendored as a git submodule under third_party/Stim, pinned to
+  v1.14.0. A copy of the Apache 2.0 license is included at
+  third_party/Stim/LICENSE.
+
+three.js
+  https://github.com/mrdoob/three.js
+  Copyright the three.js authors
+  Licensed under the MIT License.
+  Loaded from a CDN at runtime by the interactive 3D viewer; not redistributed
+  with this extension.
