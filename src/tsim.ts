@@ -113,6 +113,47 @@ export function shorthandToStim(text: string): string {
   return text;
 }
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Lines whose instruction is `gate` (the leading token, ignoring any [tag] and
+// arguments). Used to point at the source of stim's "Gate not found" error.
+// Returns trimmed text, deduplicated, comments stripped.
+export function findGateLines(text: string, gate: string): string[] {
+  const head = new RegExp(`^${escapeRegExp(gate)}(?![A-Za-z0-9_])`);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const rawLine of text.split("\n")) {
+    const hashIdx = rawLine.indexOf("#");
+    const trimmed = (hashIdx >= 0 ? rawLine.slice(0, hashIdx) : rawLine).trim();
+    if (!head.test(trimmed) || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    out.push(trimmed);
+  }
+  return out;
+}
+
+// stim has no API to report which line failed to parse, but its error names the
+// offending gate (e.g. "Gate not found: 'RJK'"). Quote that line when we can
+// find it; otherwise surface stim's reason verbatim. No assumptions about why a
+// gate is unknown — any unparseable instruction is reported the same way.
+export function explainStimError(text: string, reason: string): string {
+  const m = /Gate not found: '([^']+)'/.exec(reason);
+  if (m) {
+    const lines = findGateLines(text, m[1]);
+    if (lines.length > 0) {
+      const lead =
+        lines.length > 1
+          ? `Unknown instruction '${m[1]}' on the following lines`
+          : `Unknown instruction '${m[1]}' on the following line`;
+      const listed = lines.map((l) => `  ${l}`).join("\n");
+      return `Circuit could not be parsed. ${lead}:\n${listed}`;
+    }
+  }
+  return `Circuit could not be parsed: ${reason}`;
+}
+
 // --- placeholders + relabel (port of diagram.py) -----------------------------
 
 export interface GateLabel {

@@ -1,0 +1,5 @@
+QUBIT_COORDS(0, 0) 0
+R 0
+H 0
+R_Z({physical_angle}) 0
+M 0

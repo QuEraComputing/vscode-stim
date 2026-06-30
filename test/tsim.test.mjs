@@ -1,12 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import {
   shorthandToStim,
   toPlaceholders,
   relabelSvg,
   placeholdersToT,
   parseParametricTag,
+  findGateLines,
+  explainStimError,
 } from "../dist-test/tsim.js";
+import { getCircuitStats } from "../dist-test/stimEngine.js";
 import { renderDiagram, renderDiagramFull, withoutNoiseText } from "../dist-test/stimEngine.js";
 
 // --- lowering (shorthand -> tagged stim) ---
@@ -32,6 +37,41 @@ test("parseParametricTag accepts scientific notation", () => {
   assert.deepStrictEqual(parseParametricTag("R_Z(theta=2.5e-1*pi)"), ["R_Z", { theta: 0.25 }]);
   assert.deepStrictEqual(parseParametricTag("R_X(theta=1.5E+0*pi)"), ["R_X", { theta: 1.5 }]);
   assert.deepStrictEqual(parseParametricTag("R_Y(theta=-2.5e-1*pi)"), ["R_Y", { theta: -0.25 }]);
+});
+
+// --- mapping stim's parse error to the offending line ---
+
+test("findGateLines matches the instruction token, with or without a tag", () => {
+  const text = "H 0\nRJK 0 1\nM 0\nRJK[foo] 2\nRJKX 3";
+  assert.deepStrictEqual(findGateLines(text, "RJK"), ["RJK 0 1", "RJK[foo] 2"]);
+});
+
+test("explainStimError quotes the line for an unknown gate", () => {
+  const msg = explainStimError("H 0\nRJK 0 1\nM 0", "Gate not found: 'RJK'");
+  assert.match(msg, /Circuit could not be parsed\./);
+  assert.match(msg, /Unknown instruction 'RJK'/);
+  assert.match(msg, /RJK 0 1/);
+});
+
+test("explainStimError lists every matching line for a repeated unknown gate", () => {
+  const msg = explainStimError("R_Z({a}) 0\nH 0\nR_Z({b}) 1", "Gate not found: 'R_Z'");
+  assert.match(msg, /following lines/);
+  assert.match(msg, /R_Z\(\{a\}\) 0/);
+  assert.match(msg, /R_Z\(\{b\}\) 1/);
+});
+
+test("explainStimError falls back to stim's reason when no line is found", () => {
+  const msg = explainStimError("H 0\nCX 0", "Two qubit gate CX requires an even number of targets but was given (0).");
+  assert.match(msg, /Circuit could not be parsed: Two qubit gate CX requires/);
+});
+
+// Integration: stim's real error mapped back to the offending fixture line.
+test("explainStimError points at the offending line in a fixture", async () => {
+  const fixture = fileURLToPath(new URL("./fixtures/parametric_unset.stim", import.meta.url));
+  const lowered = shorthandToStim(readFileSync(fixture, "utf8"));
+  const stats = await getCircuitStats(lowered);
+  const msg = explainStimError(lowered, stats.error);
+  assert.match(msg, /R_Z\(\{physical_angle\}\) 0/);
 });
 
 // --- placeholders_to_t (port of test_placeholders_replace_err_and_annotation_removed) ---

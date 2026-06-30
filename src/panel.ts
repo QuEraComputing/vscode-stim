@@ -16,7 +16,7 @@ import {
   DiagramType,
   DemDiagramType,
 } from "./stimEngine";
-import { shorthandToStim, toPlaceholders, relabelSvg } from "./tsim";
+import { shorthandToStim, toPlaceholders, relabelSvg, explainStimError } from "./tsim";
 
 // Base diagram families shown in the segmented control. The actual stim
 // diagram-type string is derived from the base plus its sub-toggles.
@@ -266,6 +266,12 @@ export class StimPanel {
     // strip noise from the circuit up front instead of during the render.
     const withoutNoise = relabel ? false : wantNoiseStrip;
     try {
+      // Check parseability up front so every diagram path reports the offending
+      // line(s) instead of stim's opaque error (or a bare "could not parse").
+      const parseProblem = await this.parseError(text);
+      if (parseProblem) {
+        throw new Error(parseProblem);
+      }
       // Slice diagrams index by tick. stim ticks are 0-based, so a circuit with
       // N TICKs has slices 0..N (N+1 layers). Clamp to [0, count_ticks]; tick
       // count_ticks+1 makes stim divide by zero.
@@ -325,6 +331,13 @@ export class StimPanel {
         message: String(e?.message ?? e),
       });
     }
+  }
+
+  // A user-facing explanation of why the (lowered) circuit can't be parsed, or
+  // null if it parses. Asks stim, then maps its error to the offending line.
+  private async parseError(text: string): Promise<string | null> {
+    const stats = await getCircuitStats(text);
+    return stats.error ? explainStimError(text, stats.error) : null;
   }
 
   // Render the match graph straight from a detector error model.
