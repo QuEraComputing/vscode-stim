@@ -1,6 +1,6 @@
 # Stim for VS Code
 
-Syntax highlighting and interactive circuit visualization for [Stim](https://github.com/quantumlib/Stim) `.stim` files.
+Syntax highlighting and interactive circuit visualization for [Stim](https://github.com/quantumlib/Stim) `.stim` and `.dem` files.
 
 Diagrams are produced by Stim's C++ core compiled to WebAssembly, so the output matches Stim exactly and runs entirely inside the editor with no Python or native dependencies.
 
@@ -10,6 +10,14 @@ Diagrams are produced by Stim's C++ core compiled to WebAssembly, so the output 
 - **Autocomplete** for gate and annotation names.
 - **Circuit visualizer** opened from the editor title bar or the `Stim: Visualize Circuit` command.
 - **Diagram types**: `timeline-svg`, `timeline-3d`, `timeslice-svg`, `detslice-svg`, `detslice-with-ops-svg`, `matchgraph-svg`, `matchgraph-3d`.
+
+## Quick Start
+
+Open a `.stim` or `.dem` file. In the editor title bar, click the 📊-button if visible, or in the `...`-menu, select `Stim: Visualize Circuit`.
+![Screenshot of the Stim VS Code extension](media/screenshot2.png)
+
+Toggle between different visualization types in the visualization panel.
+![Screenshot of the Stim VS Code extension](media/screenshot1.png)
 
 
 ## Install from source
@@ -23,7 +31,7 @@ Then press `F5` in VS Code to launch an Extension Development Host with the exte
 
 ## Building the WebAssembly engine
 
-The compiled engine (`wasm/out/stim_diagram.{js,wasm}`) is checked in, so building it is only needed when changing the binding or updating Stim.
+The compiled engine (`wasm/out/stim_diagram.{js,wasm}`) is checked in with LFS, so building it is only needed when changing the binding or updating Stim.
 
 Requirements: the [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) on your `PATH` (`em++`). Stim's source is vendored as a submodule pinned to `v1.16.0`.
 
