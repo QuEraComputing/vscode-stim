@@ -81,7 +81,7 @@ Three parts:
 ## Repo layout
 
 ```
-stim_vscode/
+vscode-stim/
   package.json                       # manifest: language, command, menu button
   src/extension.ts                   # activate, command, panel manager
   src/stimEngine.ts                  # loads wasm, diagram() wrapper

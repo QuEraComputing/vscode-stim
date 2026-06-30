@@ -14,14 +14,14 @@
 
 - **stim internal API**: This plan calls stim's *internal* drawing classes (`stim_draw_internal::*`), not the public Python API. These signatures were taken from stim `main`. **Pin stim to a tag and verify the signatures in `wasm/binding.cpp` against the checked-out headers before building** — internal APIs can shift between versions. If a signature differs, adjust the call; the *shape* of the binding stays the same.
 - **emsdk**: Tasks assume `em++` is on `PATH`. Task 1 verifies/installs emsdk.
-- Run all commands from the repo root `/Users/rafaelhaenel/Documents/apps/stim_vscode` unless stated otherwise.
+- Run all commands from the repo root `/Users/rafaelhaenel/Documents/apps/vscode-stim` unless stated otherwise.
 
 ---
 
 ## File structure
 
 ```
-stim_vscode/
+vscode-stim/
   package.json              # extension manifest + scripts + deps
   tsconfig.json
   esbuild.js                # bundle src/ -> dist/extension.js
