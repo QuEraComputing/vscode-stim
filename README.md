@@ -14,10 +14,10 @@ Diagrams are produced by Stim's C++ core compiled to WebAssembly, so the output 
 ## Quick Start
 
 Open a `.stim` or `.dem` file. In the editor title bar, click the 📊-button if visible, or in the `...`-menu, select `Stim: Visualize Circuit`.
-![Screenshot of the Stim VS Code extension](https://raw.githubusercontent.com/QuEraComputing/vscode-stim/main/media/screenshot2.png)
+![Screenshot of the Stim VS Code extension](https://github.com/QuEraComputing/vscode-stim/raw/main/media/screenshot2.png)
 
 Toggle between different visualization types in the visualization panel.
-![Screenshot of the Stim VS Code extension](https://raw.githubusercontent.com/QuEraComputing/vscode-stim/main/media/screenshot1.png)
+![Screenshot of the Stim VS Code extension](https://github.com/QuEraComputing/vscode-stim/raw/main/media/screenshot1.png)
 
 
 ## Install from source
