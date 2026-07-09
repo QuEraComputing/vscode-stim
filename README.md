@@ -14,10 +14,10 @@ Diagrams are produced by Stim's C++ core compiled to WebAssembly, so the output 
 ## Quick Start
 
 Open a `.stim` or `.dem` file. In the editor title bar, click the 📊-button if visible, or in the `...`-menu, select `Stim: Visualize Circuit`.
-![Screenshot of the Stim VS Code extension](media/screenshot2.png)
+![Screenshot of the Stim VS Code extension](https://raw.githubusercontent.com/QuEraComputing/vscode-stim/main/media/screenshot2.png)
 
 Toggle between different visualization types in the visualization panel.
-![Screenshot of the Stim VS Code extension](media/screenshot1.png)
+![Screenshot of the Stim VS Code extension](https://raw.githubusercontent.com/QuEraComputing/vscode-stim/main/media/screenshot1.png)
 
 
 ## Install from source
@@ -51,6 +51,17 @@ npm run test:grammar  # TextMate grammar tests
 npm run test:wasm     # WebAssembly engine smoke tests
 npm run test:engine   # engine wrapper tests
 ```
+
+## Release
+
+VSIX files are built by GitHub Actions and must not be committed. To publish a release, push a version tag:
+
+```bash
+git tag v0.0.1
+git push origin v0.0.1
+```
+
+The release workflow packages the extension and attaches the generated VSIX to the GitHub release.
 
 ## Notes
 

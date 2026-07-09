@@ -1,3 +1,4 @@
+*.vsix
 .vscode/**
 .github/**
 src/**
@@ -5,6 +6,7 @@ test/**
 third_party/**
 node_modules/**
 **/.DS_Store
+media/screenshot*.png
 wasm/binding.cpp
 wasm/build-wasm.sh
 wasm/harness.mjs

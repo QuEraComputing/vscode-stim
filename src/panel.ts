@@ -35,6 +35,20 @@ const TICK_DEPENDENT_BASES: BaseType[] = ["timeslice", "detslice"];
 // Bases that also have an interactive 3D form (the 2d|3d toggle).
 const DIM_CAPABLE_BASES: BaseType[] = ["timeline", "matchgraph"];
 
+// True if the last meaningful line of the circuit is a bare TICK (optionally
+// tagged, e.g. TICK[DISABLE_ERROR]). Such a trailing TICK leaves an empty final
+// time slice that stim's per-tick renderer can't draw (divide by zero).
+function endsWithTick(text: string): boolean {
+  const lines = text.split("\n");
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const hash = lines[i].indexOf("#");
+    const body = (hash >= 0 ? lines[i].slice(0, hash) : lines[i]).trim();
+    if (!body) continue; // skip blank / comment-only lines
+    return /^TICK(\[[^\]]*\])?$/.test(body);
+  }
+  return false;
+}
+
 // A titled group of label/value rows in the info tooltip.
 interface StatSection {
   title: string;
@@ -202,11 +216,10 @@ export class StimPanel {
         rows: this.rows,
       });
       this.refresh();
-    } else if (msg.command === "refresh") {
-      // Requested by the webview after the panel finishes resizing.
-      this.refresh();
     } else if (msg.command === "copySvg") {
       void this.copySvgToClipboard(String(msg.svg ?? ""));
+    } else if (msg.command === "saveSvg") {
+      void this.saveSvgToFile(String(msg.svg ?? ""));
     } else if (msg.command === "setBase") {
       this.base = msg.base;
       this.refresh();
@@ -274,12 +287,17 @@ export class StimPanel {
       }
       // Slice diagrams index by tick. stim ticks are 0-based, so a circuit with
       // N TICKs has slices 0..N (N+1 layers). Clamp to [0, count_ticks]; tick
-      // count_ticks+1 makes stim divide by zero.
+      // count_ticks+1 makes stim divide by zero. A circuit ending in a trailing
+      // TICK has an empty final slice (tick == count_ticks) that stim also can't
+      // render (divide by zero), so drop it from the range.
       let tickMax = 0;
       if (dependent) {
         tickMax = await countTicks(text);
         if (tickMax < 0) {
           throw new Error("Circuit could not be parsed.");
+        }
+        if (tickMax > 0 && endsWithTick(text)) {
+          tickMax -= 1;
         }
         this.tick = Math.min(Math.max(0, this.tick), tickMax);
       }
@@ -472,6 +490,29 @@ export class StimPanel {
     }
   }
 
+  // Suggest a filename from the document + diagram type, then save the SVG to
+  // wherever the user picks in the native save dialog.
+  private async saveSvgToFile(svg: string) {
+    const base = (this.doc.uri.path.split("/").pop() || "diagram").replace(/\.stim$/, "");
+    const typeName = this.currentType().replace(/-svg$/, "");
+    const defaultName = `${base}-${typeName}.svg`;
+    const defaultUri =
+      this.doc.uri.scheme === "file"
+        ? vscode.Uri.joinPath(vscode.Uri.file(path.dirname(this.doc.uri.fsPath)), defaultName)
+        : vscode.Uri.file(defaultName);
+    const target = await vscode.window.showSaveDialog({
+      defaultUri,
+      saveLabel: "Save diagram",
+      filters: { "SVG image": ["svg"] },
+    });
+    if (!target) return; // dialog cancelled
+    try {
+      await fs.promises.writeFile(target.fsPath, svg, "utf8");
+    } catch (e: any) {
+      vscode.window.showErrorMessage(`Could not save the SVG: ${String(e?.message ?? e)}`);
+    }
+  }
+
   private dispose() {
     StimPanel.panels.delete(this.doc.uri.toString());
     while (this.disposables.length) this.disposables.pop()?.dispose();
@@ -546,11 +587,15 @@ export class StimPanel {
         <button id="tick-next" class="step" title="Next layer (→ or e; shift+e = +5, end = last)">▶</button>
       </div>
     </div>
-    <span id="info-wrap">
-      <button id="info-btn" aria-label="Circuit info">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-      </button>
-      <div id="info-tip" role="tooltip"></div>
+    <span id="right-tools">
+      <button id="save-btn" aria-label="Save diagram as SVG"></button>
+      <button id="copy-btn" aria-label="Copy diagram as SVG"></button>
+      <span id="info-wrap">
+        <button id="info-btn" aria-label="Circuit info">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        </button>
+        <div id="info-tip" role="tooltip"></div>
+      </span>
     </span>
   </div>
   <div id="view"></div>

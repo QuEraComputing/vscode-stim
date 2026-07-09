@@ -17,6 +17,8 @@
   const rowsControl = document.getElementById("rows-control");
   const rowsInput = document.getElementById("rows-input");
   const infoTip = document.getElementById("info-tip");
+  const copyBtn = document.getElementById("copy-btn");
+  const saveBtn = document.getElementById("save-btn");
 
   let state = {
     kind: "circuit",
@@ -224,7 +226,8 @@
 
   // Wrap a raw SVG string in a zoomable, scrollable container. Ctrl/Cmd + wheel
   // (and trackpad pinch, which the browser reports as ctrl+wheel) zooms toward
-  // the cursor; plain scroll pans. Ported from the tsim wrap_svg_zoomable helper.
+  // the cursor; plain wheel scroll and click-and-drag both pan. Ported from the
+  // tsim wrap_svg_zoomable helper.
   // opts: { fill } to fill the panel (fit the whole SVG into the available
   // area, used for the single view) or { height } for a fixed-height box
   // (used for each item in full mode).
@@ -268,15 +271,16 @@
       sizer.style.height = natH * scale + "px";
     }
 
-    // Fit once the container has been laid out: fill mode fits the whole SVG
-    // into the available area (so wide diagrams span the full width); fixed
-    // mode fits to the given height, capped to the container width.
+    // Fit once the container has been laid out. fill mode either fills the full
+    // width (fitWidth: for the tall all-ticks view, letting it overflow/scroll
+    // vertically) or fits the whole SVG into the available area; fixed mode fits
+    // to the given height, capped to the container width.
     function fit() {
       const cw = wrap.clientWidth;
       const ch = wrap.clientHeight;
       if (cw <= 0 || natW <= 0 || natH <= 0) return;
       if (opts.fill) {
-        scale = Math.min(cw / natW, ch / natH);
+        scale = opts.fitWidth ? cw / natW : Math.min(cw / natW, ch / natH);
       } else {
         scale = Math.min((opts.height || 700) / natH, cw / natW);
       }
@@ -285,78 +289,191 @@
     apply();
     requestAnimationFrame(fit);
 
+    // Accumulated wheel delta for tick stepping (so a trackpad's many small
+    // deltas don't fly through ticks; one mouse notch ~= one step).
+    let wheelAccum = 0;
+    const WHEEL_PER_TICK = 60;
     wrap.addEventListener(
       "wheel",
       (e) => {
-        if (!(e.ctrlKey || e.metaKey)) return;
-        e.preventDefault();
-        const rect = wrap.getBoundingClientRect();
-        const mx = e.clientX - rect.left + wrap.scrollLeft;
-        const my = e.clientY - rect.top + wrap.scrollTop;
-        const factor = Math.exp(-e.deltaY * 0.01);
-        const newScale = Math.min(Math.max(0.02, scale * factor), 40);
-        const ratio = newScale / scale;
-        scale = newScale;
-        apply();
-        wrap.scrollLeft = mx * ratio - (e.clientX - rect.left);
-        wrap.scrollTop = my * ratio - (e.clientY - rect.top);
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          const rect = wrap.getBoundingClientRect();
+          const mx = e.clientX - rect.left + wrap.scrollLeft;
+          const my = e.clientY - rect.top + wrap.scrollTop;
+          const factor = Math.exp(-e.deltaY * 0.01);
+          const newScale = Math.min(Math.max(0.02, scale * factor), 40);
+          const ratio = newScale / scale;
+          scale = newScale;
+          apply();
+          wrap.scrollLeft = mx * ratio - (e.clientX - rect.left);
+          wrap.scrollTop = my * ratio - (e.clientY - rect.top);
+          return;
+        }
+        // In single-tick slice mode the wheel steps through layers instead of
+        // panning (drag and the scrollbars still pan). Other views pan natively.
+        if (isTickDependent() && !state.full) {
+          e.preventDefault();
+          let dy = e.deltaY;
+          if (e.deltaMode === 1) dy *= 16; // lines -> px
+          else if (e.deltaMode === 2) dy *= wrap.clientHeight || 400; // pages -> px
+          wheelAccum += dy;
+          let steps = 0;
+          while (wheelAccum >= WHEEL_PER_TICK) { wheelAccum -= WHEEL_PER_TICK; steps++; }
+          while (wheelAccum <= -WHEEL_PER_TICK) { wheelAccum += WHEEL_PER_TICK; steps--; }
+          if (steps) setTick(state.tick + steps);
+        }
       },
       { passive: false }
     );
 
+    // Click-and-drag to pan (left button, no modifier). Plain wheel scrolling is
+    // left to the container's native overflow handling.
+    let dragging = false;
+    let startX = 0;
+    let startY = 0;
+    let startLeft = 0;
+    let startTop = 0;
+    wrap.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      dragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      startLeft = wrap.scrollLeft;
+      startTop = wrap.scrollTop;
+      wrap.setPointerCapture(e.pointerId);
+      wrap.classList.add("dragging");
+      e.preventDefault();
+    });
+    wrap.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      wrap.scrollLeft = startLeft - (e.clientX - startX);
+      wrap.scrollTop = startTop - (e.clientY - startY);
+    });
+    function endDrag(e) {
+      if (!dragging) return;
+      dragging = false;
+      wrap.classList.remove("dragging");
+      if (e && e.pointerId != null && wrap.hasPointerCapture(e.pointerId)) {
+        wrap.releasePointerCapture(e.pointerId);
+      }
+    }
+    wrap.addEventListener("pointerup", endDrag);
+    wrap.addEventListener("pointercancel", endDrag);
+
     return wrap;
   }
-
-  // What the view currently shows, so resize handling knows whether to re-fit.
-  let currentKind = null;
 
   const COPY_ICON =
     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
   const CHECK_ICON =
     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+  const SAVE_ICON =
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
 
-  // Gray copy button pinned to the top-right of the SVG. The host copies the SVG
-  // as a file reference so it pastes into PowerPoint as a vector picture.
-  function makeCopyButton(svgString) {
-    const btn = document.createElement("button");
-    btn.className = "copy-btn";
-    btn.title = "Copy diagram (paste into PowerPoint as SVG)";
-    btn.setAttribute("aria-label", "Copy diagram as SVG");
-    btn.innerHTML = COPY_ICON;
-    btn.addEventListener("click", () => {
-      vscode.postMessage({ command: "copySvg", svg: svgString });
-      btn.innerHTML = CHECK_ICON;
-      btn.classList.add("copied");
-      btn.title = "Copied";
-      setTimeout(() => {
-        btn.innerHTML = COPY_ICON;
-        btn.classList.remove("copied");
-        btn.title = "Copy diagram (paste into PowerPoint as SVG)";
-      }, 1200);
-    });
-    return btn;
+  // Toolbar save + copy buttons (left of the info button), acting on the SVG
+  // currently on screen. Both are hidden unless an SVG diagram is shown (not for
+  // the 3D viewer or errors). Copy puts the SVG as a file reference on the
+  // clipboard so it pastes into PowerPoint as a vector picture; save opens a
+  // file dialog on the host.
+  const COPY_TITLE = "Copy SVG to clipboard";
+  let currentSvg = null;
+
+  saveBtn.innerHTML = SAVE_ICON;
+  saveBtn.title = "Save SVG to file";
+  saveBtn.style.display = "none";
+  saveBtn.addEventListener("click", () => {
+    if (currentSvg == null) return;
+    vscode.postMessage({ command: "saveSvg", svg: currentSvg });
+  });
+
+  copyBtn.innerHTML = COPY_ICON;
+  copyBtn.title = COPY_TITLE;
+  copyBtn.style.display = "none";
+  copyBtn.addEventListener("click", () => {
+    if (currentSvg == null) return;
+    vscode.postMessage({ command: "copySvg", svg: currentSvg });
+    copyBtn.innerHTML = CHECK_ICON;
+    copyBtn.classList.add("copied");
+    copyBtn.title = "Copied";
+    setTimeout(() => {
+      copyBtn.innerHTML = COPY_ICON;
+      copyBtn.classList.remove("copied");
+      copyBtn.title = COPY_TITLE;
+    }, 1200);
+  });
+
+  // Show/hide the save + copy buttons together (only meaningful for SVGs).
+  function setSvgTools(visible) {
+    saveBtn.style.display = visible ? "" : "none";
+    copyBtn.style.display = visible ? "" : "none";
   }
 
   function showSingle(svg) {
-    currentKind = "svg";
-    const stage = document.createElement("div");
-    stage.className = "view-stage";
-    stage.appendChild(makeZoomable(svg, { fill: true }));
-    stage.appendChild(makeCopyButton(svg));
-    view.replaceChildren(stage);
+    currentSvg = svg;
+    setSvgTools(true);
+    // The all-ticks view is a tall stack, so start it filling the full width.
+    const fitWidth = state.full && isTickDependent();
+    view.replaceChildren(makeZoomable(svg, { fill: true, fitWidth }));
   }
 
   // Interactive 3D viewer: stim's self-contained HTML page in an iframe.
   function showHtml(html) {
-    currentKind = "html";
+    currentSvg = null;
+    setSvgTools(false);
     const frame = document.createElement("iframe");
     frame.className = "viewer-iframe";
-    frame.srcdoc = html;
     view.replaceChildren(frame);
+    frame.addEventListener("load", () => ensure3dViewerPaints(frame));
+    frame.srcdoc = html;
+  }
+
+  // stim's 3D viewer paints once via a single requestAnimationFrame, then only
+  // re-renders from a ResizeObserver on its container. A freshly inserted webview
+  // iframe is sometimes not granted an animation frame until an outside repaint
+  // happens (opening the devtools is enough), so that one paint never runs and
+  // the view stays blank. We can't change stim's HTML, and its render objects are
+  // module-scoped, so the only lever from here is to force a paint: once the
+  // viewer has built its <canvas>, change the iframe height by 1px so the
+  // container's ResizeObserver fires and the browser composites the frame.
+  function nudgeReflow(frame) {
+    if (!frame.isConnected) return;
+    frame.style.height = "calc(100% - 1px)";
+    requestAnimationFrame(() => {
+      if (frame.isConnected) frame.style.height = "";
+    });
+  }
+  function ensure3dViewerPaints(frame) {
+    let doc;
+    try {
+      doc = frame.contentDocument;
+    } catch (_) {
+      doc = null; // cross-origin (unexpected for srcdoc)
+    }
+    if (!doc) {
+      nudgeReflow(frame);
+      return;
+    }
+    if (doc.querySelector("canvas")) {
+      nudgeReflow(frame);
+      return;
+    }
+    // The viewer builds its <canvas> asynchronously (module imports + model
+    // load). Watch for it, then nudge exactly once.
+    const obs = new MutationObserver(() => {
+      if (doc.querySelector("canvas")) {
+        obs.disconnect();
+        nudgeReflow(frame);
+      }
+    });
+    obs.observe(doc.documentElement, { childList: true, subtree: true });
+    // Don't observe forever if something goes wrong / the view is replaced.
+    setTimeout(() => obs.disconnect(), 30000);
   }
 
   function showError(message) {
-    currentKind = "error";
+    currentSvg = null;
+    setSvgTools(false);
     const pre = document.createElement("pre");
     pre.className = "error";
     pre.textContent = message;
@@ -382,19 +499,6 @@
       )
       .join("");
   }
-
-  // When the panel finishes resizing, re-render the SVG so it re-fits the new
-  // size. Skipped for the 3D iframe (re-rendering would reset the orbit camera).
-  let resizeTimer = null;
-  window.addEventListener("resize", () => {
-    if (resizeTimer) clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => {
-      resizeTimer = null;
-      if (currentKind === "svg") {
-        vscode.postMessage({ command: "refresh" });
-      }
-    }, 200);
-  });
 
   window.addEventListener("message", (event) => {
     const msg = event.data;

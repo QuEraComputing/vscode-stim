@@ -4,15 +4,15 @@
   "description": "Syntax highlighting and circuit visualization for .stim and .dem files",
   "version": "0.0.1",
   "publisher": "local",
-  "author": "Rafael Haenel",
+  "author": "QuEra Computing Inc",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/CHANGEME/stim-vscode"
+    "url": "https://github.com/QuEraComputing/vscode-stim.git"
   },
-  "homepage": "https://github.com/CHANGEME/stim-vscode#readme",
+  "homepage": "https://github.com/QuEraComputing/vscode-stim#readme",
   "bugs": {
-    "url": "https://github.com/CHANGEME/stim-vscode/issues"
+    "url": "https://github.com/QuEraComputing/vscode-stim/issues"
   },
   "icon": "media/vscode-stim.png",
   "engines": {
@@ -101,6 +101,7 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.6.0",
     "esbuild": "^0.20.0",
     "typescript": "^5.4.0",
     "vscode-tmgrammar-test": "^0.1.3"
