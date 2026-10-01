@@ -30,6 +30,18 @@ Toggle between different visualization types in the visualization panel.
 ![Screenshot of the Stim VS Code extension](https://github.com/QuEraComputing/vscode-stim/blob/5dd52a3042384879ef94827b30ad6c78b45894d1/media/screenshot1.png?raw=true)
 
 
+## SVG navigation
+
+By default, hold **Ctrl** (or **Cmd** on macOS) while scrolling to zoom. Plain scrolling pans, except in single-layer slice views where it changes layers. Left-button dragging pans in either mode.
+
+To zoom with plain scrolling instead, open VS Code Settings and set **Stim: Svg Zoom Mode** to **scroll**, or add this to your user or workspace settings:
+
+```json
+"stim.svgZoomMode": "scroll"
+```
+
+This applies immediately to open SVG viewers, including `.dem` matching graphs. In this mode, use the layer controls or keyboard to change slice layers. Set the value back to `ctrlScroll` to restore the default. Interactive 3D viewers are unaffected.
+
 ## Tsim support
 
 The `.stim` and `.tsim` extensions share the same language mode, syntax highlighting, editor features, and circuit visualizer. No file association setting or Python installation is needed.
@@ -68,6 +80,7 @@ npm run watch         # rebuild the extension on change
 npm run test:grammar  # TextMate grammar tests
 npm run test:wasm     # WebAssembly engine smoke tests
 npm run test:engine   # engine wrapper tests
+npm run test:viewer   # SVG viewer interaction and settings tests
 ```
 
 ## Release
