@@ -8,8 +8,22 @@ Stim
   Copyright The Stim authors and Google LLC
   Licensed under the Apache License, Version 2.0.
   The source is vendored as a git submodule under third_party/Stim, pinned to
-  v1.14.0. A copy of the Apache 2.0 license is included at
-  third_party/Stim/LICENSE.
+  v1.16.0. A copy of the Apache 2.0 license is included at
+  LICENSE-Stim.txt.
+
+Emscripten and WebAssembly runtime libraries
+  https://github.com/emscripten-core/emscripten
+  The generated JavaScript loader and WebAssembly engine include runtime code
+  from Emscripten and its C/C++ libraries. License texts and copyright notices
+  from the local Emscripten 6.0.1 SDK are included in LICENSE-Emscripten.txt,
+  LICENSE-musl.txt, LICENSE-libcxx.txt, LICENSE-libcxxabi.txt, and
+  LICENSE-compiler-rt.txt.
+
+@xmldom/xmldom
+  https://github.com/xmldom/xmldom
+  Licensed under the MIT License.
+  Bundled into the extension host code. A copy of the license and copyright
+  notices is included at LICENSE-xmldom.txt.
 
 three.js
   https://github.com/mrdoob/three.js

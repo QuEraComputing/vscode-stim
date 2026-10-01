@@ -11,6 +11,16 @@ Diagrams are produced by Stim's C++ core compiled to WebAssembly, so the output 
 - **Circuit visualizer** opened from the editor title bar or the `Stim: Visualize Circuit` command.
 - **Diagram types**: `timeline-svg`, `timeline-3d`, `timeslice-svg`, `detslice-svg`, `detslice-with-ops-svg`, `matchgraph-svg`, `matchgraph-3d`.
 
+## Install
+
+Install [Stim by QuEra Computing Inc.](https://marketplace.visualstudio.com/items?itemName=QuEraComputing.vscode-stim) from the VS Code Marketplace, or run:
+
+```bash
+code --install-extension QuEraComputing.vscode-stim
+```
+
+For manual installation, download the VSIX from [GitHub Releases](https://github.com/QuEraComputing/vscode-stim/releases) and use **Extensions: Install from VSIX** in VS Code or Cursor.
+
 ## Quick Start
 
 Open a `.stim` or `.dem` file. In the editor title bar, click the 📊-button if visible, or in the `...`-menu, select `Stim: Visualize Circuit`.
@@ -57,11 +67,13 @@ npm run test:engine   # engine wrapper tests
 VSIX files are built by GitHub Actions and must not be committed. To publish a release, push a version tag:
 
 ```bash
-git tag v0.0.1
-git push origin v0.0.1
+git tag v0.1.0
+git push origin v0.1.0
 ```
 
 The release workflow packages the extension and attaches the generated VSIX to the GitHub release.
+
+To publish to the VS Code Marketplace, upload that VSIX through the [QuEra Computing publisher portal](https://marketplace.visualstudio.com/manage/publishers/QuEraComputing). GitHub releases do not automatically publish to the Marketplace. The package version must match the tag and use a numeric `major.minor.patch` version.
 
 ## Notes
 
@@ -69,4 +81,4 @@ The interactive 3D viewer loads three.js from a CDN at runtime, so it needs netw
 
 ## License
 
-MIT, see [LICENSE](LICENSE). This extension bundles a WebAssembly build of Stim, which is licensed under Apache License 2.0. See [NOTICE](NOTICE) for attribution.
+The extension's own code is MIT-licensed; see [LICENSE](LICENSE). The bundled Stim engine is licensed under Apache License 2.0; see [LICENSE-Stim.txt](LICENSE-Stim.txt). Third-party components retain their respective licenses. See [NOTICE](NOTICE) and the included `LICENSE-*.txt` files for attribution and license terms.

@@ -2,8 +2,8 @@
   "name": "vscode-stim",
   "displayName": "Stim",
   "description": "Syntax highlighting and circuit visualization for .stim and .dem files",
-  "version": "0.1.1-dev",
-  "publisher": "local",
+  "version": "0.1.0",
+  "publisher": "QuEraComputing",
   "author": "QuEra Computing Inc",
   "license": "MIT",
   "repository": {
