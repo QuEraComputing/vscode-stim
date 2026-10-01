@@ -1,4 +1,4 @@
-# Stim and Tsim for VS Code
+# Stim for VS Code
 
 Syntax highlighting and interactive circuit visualization for [Stim](https://github.com/quantumlib/Stim) and [Tsim](https://github.com/QuEraComputing/tsim) circuits in `.stim` and `.tsim` files, plus `.dem` detector error models.
 
