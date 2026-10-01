@@ -50,7 +50,7 @@
       "end": "\\)",
       "endCaptures": { "0": { "name": "punctuation.bracket.stim" } },
       "patterns": [
-        { "match": "-?\\d+(?:\\.\\d*)?(?:[eE][+-]?\\d+)?", "name": "constant.numeric.stim" }
+        { "match": "[+-]?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?", "name": "constant.numeric.stim" }
       ]
     },
     "tag": { "match": "\\[[^\\]]*\\]", "name": "string.other.stim" },

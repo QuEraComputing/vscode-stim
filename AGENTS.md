@@ -4,7 +4,7 @@ Guidance for AI coding agents working in this repository.
 
 ## Project Overview
 
-This is a VS Code extension for Stim `.stim` and `.dem` files. It provides syntax highlighting, autocomplete, and an interactive circuit visualization panel backed by a bundled WebAssembly build of Stim.
+This is a VS Code extension for Stim and Tsim `.stim`, `.tsim`, and `.dem` files. The `.stim` and `.tsim` extensions share the `stim` language ID and editor features. It provides syntax highlighting, autocomplete, and an interactive circuit visualization panel backed by a bundled WebAssembly build of Stim.
 
 ## Common Commands
 

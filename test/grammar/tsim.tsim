@@ -1,0 +1,89 @@
+# SYNTAX TEST "source.stim" "Tsim non-Clifford instructions"
+
+T 0
+# <- support.function.stim
+
+T_DAG 1
+# <----- support.function.stim
+
+TPP X0*Y1
+# <--- support.function.stim
+#   ^^ storage.type.pauli.stim
+#     ^ keyword.operator.stim
+#      ^^ storage.type.pauli.stim
+
+TPP_DAG !Z0*X1
+# <------- support.function.stim
+#       ^^^ storage.type.pauli.stim
+
+R_X(+.25) 0
+# <--- support.function.stim
+#   ^^^^ constant.numeric.stim
+
+R_Y(-.5) 1
+# <--- support.function.stim
+#   ^^^ constant.numeric.stim
+
+R_Z(.125e+1) 2
+# <--- support.function.stim
+#   ^^^^^^^ constant.numeric.stim
+
+R_XX(0.5) 0 1
+# <---- support.function.stim
+#    ^^^ constant.numeric.stim
+
+R_YY(-2.5e-1) 0 1
+# <---- support.function.stim
+#    ^^^^^^^ constant.numeric.stim
+
+R_ZZ(+1.) 0 2
+# <---- support.function.stim
+#    ^^^ constant.numeric.stim
+
+R_PAULI(4e-4) X0*Y1*Z2
+# <------- support.function.stim
+#       ^^^^ constant.numeric.stim
+#             ^^ storage.type.pauli.stim
+#               ^ keyword.operator.stim
+
+U3(+.5, -0.25, .125E-1) 0
+# <-- support.function.stim
+#  ^^^ constant.numeric.stim
+#       ^^^^^ constant.numeric.stim
+#              ^^^^^^^ constant.numeric.stim
+
+CCZ 0 1 2
+# <--- support.function.stim
+#   ^ constant.numeric.stim
+
+CCX[tag] 0 1 2 # Toffoli
+# <--- support.function.stim
+#  ^^^^^ string.other.stim
+#              ^^^^^^^^^ comment.line.number-sign.stim
+
+T_DAG[calibration] 0
+# <----- support.function.stim
+#    ^^^^^^^^^^^^^ string.other.stim
+
+I[R_Z(theta=0.25*pi)] 0
+# <- support.function.stim
+# <~------------------- string.other.stim
+
+SPP[R_PAULI(theta=-0.5*pi)] X0*Y1
+# <--- support.function.stim
+#  ^^^^^^^^^^^^^^^^^^^^^^^^ string.other.stim
+#                           ^^ storage.type.pauli.stim
+
+REPEAT 2 {
+# <------ keyword.control.stim
+#      ^ constant.numeric.stim
+  T 0
+# ^ support.function.stim
+  R_X(.25) 1
+# ^^^ support.function.stim
+#     ^^^ constant.numeric.stim
+  DETECTOR rec[-1]
+# ^^^^^^^^ keyword.control.stim
+#          ^^^^^^^ variable.other.stim
+}
+# <- punctuation.bracket.stim
