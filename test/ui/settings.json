@@ -1,0 +1,8 @@
+{
+  "git.enabled": false,
+  "extensions.ignoreRecommendations": true,
+  "workbench.enableExperiments": false,
+  "telemetry.telemetryLevel": "off",
+  "files.autoSave": "off",
+  "editor.minimap.enabled": false
+}

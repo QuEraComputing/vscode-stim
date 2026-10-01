@@ -35,7 +35,7 @@ const TICK_DEPENDENT_BASES: BaseType[] = ["timeslice", "detslice"];
 // Bases that also have an interactive 3D form (the 2d|3d toggle).
 const DIM_CAPABLE_BASES: BaseType[] = ["timeline", "matchgraph"];
 
-// True if the last meaningful line of the circuit is a bare TICK (optionally
+// True if the last instruction, including inside a repeat, is a TICK (optionally
 // tagged, e.g. TICK[DISABLE_ERROR]). Such a trailing TICK leaves an empty final
 // time slice that stim's per-tick renderer can't draw (divide by zero).
 function endsWithTick(text: string): boolean {
@@ -43,7 +43,7 @@ function endsWithTick(text: string): boolean {
   for (let i = lines.length - 1; i >= 0; i--) {
     const hash = lines[i].indexOf("#");
     const body = (hash >= 0 ? lines[i].slice(0, hash) : lines[i]).trim();
-    if (!body) continue; // skip blank / comment-only lines
+    if (!body || body === "}") continue;
     return /^TICK(\[[^\]]*\])?$/.test(body);
   }
   return false;
@@ -264,7 +264,17 @@ export class StimPanel {
     }
     // Lower tsim shorthand (T, R_X, ...) to tagged stim. Used for every stim
     // call so the circuit parses and simulates as its Clifford stand-in.
-    const text = shorthandToStim(this.doc.getText());
+    let text: string;
+    try {
+      text = shorthandToStim(this.doc.getText());
+    } catch (e: any) {
+      this.postStats(null);
+      this.panel.webview.postMessage({
+        command: "error",
+        message: String(e?.message ?? e),
+      });
+      return;
+    }
     void this.sendStats(text);
     const type = this.currentType();
     const dependent = this.isTickDependent();

@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/vscode-extension-tester/resources/extester.schema.json",
+  "setup": {
+    "vscodeVersion": "1.137.0",
+    "storage": "./.ui-tests",
+    "extensionsDir": "./.ui-tests/extensions"
+  },
+  "run": {
+    "vscodeVersion": "1.137.0",
+    "storage": "./.ui-tests",
+    "extensionsDir": "./.ui-tests/extensions",
+    "testFiles": ["./test/ui/*.test.cjs"],
+    "settings": "./test/ui/settings.json",
+    "mochaConfig": "./test/ui/mocha.json"
+  }
+}

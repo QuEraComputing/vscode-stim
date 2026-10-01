@@ -164,7 +164,7 @@
   function setTick(t) {
     let next = Math.floor(t);
     if (!Number.isFinite(next) || next < 0) next = 0;
-    if (state.tickMax > 0) next = Math.min(next, state.tickMax);
+    next = Math.min(next, state.tickMax);
     const changed = next !== state.tick;
     state.tick = next;
     tickValue.value = String(next); // mirror the clamped value back into the box
@@ -192,7 +192,7 @@
 
   function updateTickButtons() {
     tickPrev.disabled = state.tick <= 0;
-    tickNext.disabled = state.tickMax > 0 && state.tick >= state.tickMax;
+    tickNext.disabled = state.tick >= state.tickMax;
   }
 
   // Keyboard navigation through the tick/layer stepper. Active only when the
@@ -207,7 +207,7 @@
   window.addEventListener("keydown", (e) => {
     if (!isTickDependent() || state.full) return;
     if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
-    const last = state.tickMax > 0 ? state.tickMax : 1e6;
+    const last = state.tickMax;
     const key = e.key.toLowerCase();
     let handled = true;
     if (e.key === "ArrowRight" || key === "e") {
