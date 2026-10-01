@@ -1,13 +1,13 @@
-# Stim for VS Code
+# Stim and Tsim for VS Code
 
-Syntax highlighting and interactive circuit visualization for [Stim](https://github.com/quantumlib/Stim) `.stim` and `.dem` files.
+Syntax highlighting and interactive circuit visualization for [Stim](https://github.com/quantumlib/Stim) and [Tsim](https://github.com/QuEraComputing/tsim) circuits in `.stim` and `.tsim` files, plus `.dem` detector error models.
 
-Diagrams are produced by Stim's C++ core compiled to WebAssembly, so the output matches Stim exactly and runs entirely inside the editor with no Python or native dependencies.
+Diagrams are produced by Stim's C++ core compiled to WebAssembly and run entirely inside the editor with no Python or native dependencies. Tsim circuits use the extension's existing non-Clifford gate translation; see [Tsim support](#tsim-support) for its visualization limits.
 
 ## Features
 
-- **Syntax highlighting** for `.stim` and `.dem` files.
-- **Autocomplete** for gate and annotation names.
+- **Syntax highlighting** for `.stim`, `.tsim`, and `.dem` files, including Tsim's non-Clifford instructions.
+- **Autocomplete, hover documentation, and signature help** for Stim gate and annotation names in both `.stim` and `.tsim` files.
 - **Circuit visualizer** opened from the editor title bar or the `Stim: Visualize Circuit` command.
 - **Diagram types**: `timeline-svg`, `timeline-3d`, `timeslice-svg`, `detslice-svg`, `detslice-with-ops-svg`, `matchgraph-svg`, `matchgraph-3d`.
 
@@ -23,12 +23,20 @@ For manual installation, download the VSIX from [GitHub Releases](https://github
 
 ## Quick Start
 
-Open a `.stim` or `.dem` file. In the editor title bar, click the 📊-button if visible, or in the `...`-menu, select `Stim: Visualize Circuit`.
+Open a `.stim`, `.tsim`, or `.dem` file. In the editor title bar, click the 📊-button if visible, or in the `...`-menu, select `Stim: Visualize Circuit`.
 ![Screenshot of the Stim VS Code extension](https://github.com/QuEraComputing/vscode-stim/blob/5dd52a3042384879ef94827b30ad6c78b45894d1/media/screenshot2.png?raw=true)
 
 Toggle between different visualization types in the visualization panel.
 ![Screenshot of the Stim VS Code extension](https://github.com/QuEraComputing/vscode-stim/blob/5dd52a3042384879ef94827b30ad6c78b45894d1/media/screenshot1.png?raw=true)
 
+
+## Tsim support
+
+The `.stim` and `.tsim` extensions share the same language mode, syntax highlighting, editor features, and circuit visualizer. No file association setting or Python installation is needed.
+
+The grammar highlights all additional instructions currently documented by [Tsim](https://github.com/QuEraComputing/tsim#supported-instructions): `T`, `T_DAG`, `TPP`, `TPP_DAG`, `R_X`, `R_Y`, `R_Z`, `R_XX`, `R_YY`, `R_ZZ`, `R_PAULI`, `U3`, `CCZ`, and `CCX`. Signed decimal and scientific-notation arguments, Pauli-product targets, and instruction tags are highlighted too.
+
+Visualization is not full non-Clifford simulation. The 2D operation views relabel T-family and single-qubit rotation gates; `CCZ` and `CCX` are expanded into Clifford+T decompositions. Pauli rotations (`R_XX`, `R_YY`, `R_ZZ`, and `R_PAULI`) currently appear as tagged `SPP` operations. Other views, including detector slices and matching graphs, use Clifford stand-ins (for example, `T` becomes `S` and single-qubit rotations become identity), so they do not represent the exact non-Clifford circuit. Autocomplete, hover documentation, and signature help currently cover Stim's gate table, not the additional Tsim instructions.
 
 ## Install from source
 
@@ -37,7 +45,7 @@ npm install
 npm run build
 ```
 
-Then press `F5` in VS Code to launch an Extension Development Host with the extension loaded, and open a `.stim` file.
+Then press `F5` in VS Code to launch an Extension Development Host with the extension loaded, and open a `.stim` or `.tsim` file.
 
 ## Building the WebAssembly engine
 

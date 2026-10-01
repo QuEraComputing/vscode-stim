@@ -1,7 +1,7 @@
 {
   "name": "vscode-stim",
   "displayName": "Stim",
-  "description": "Syntax highlighting and circuit visualization for .stim and .dem files",
+  "description": "Syntax highlighting and circuit visualization for Stim and Tsim (.stim, .tsim, and .dem files)",
   "version": "0.1.0",
   "publisher": "QuEraComputing",
   "author": "QuEra Computing Inc",
@@ -24,6 +24,7 @@
   ],
   "keywords": [
     "stim",
+    "tsim",
     "quantum",
     "quantum error correction",
     "circuit",
@@ -40,10 +41,13 @@
         "id": "stim",
         "aliases": [
           "Stim",
-          "stim"
+          "stim",
+          "Tsim",
+          "tsim"
         ],
         "extensions": [
-          ".stim"
+          ".stim",
+          ".tsim"
         ],
         "configuration": "./language-configuration.json"
       },
@@ -93,7 +97,7 @@
     "watch": "node esbuild.js --watch",
     "build:wasm": "bash wasm/build-wasm.sh",
     "test:wasm": "node wasm/harness.mjs",
-    "test:grammar": "vscode-tmgrammar-test \"test/grammar/*.stim\"",
+    "test:grammar": "vscode-tmgrammar-test \"test/grammar/*.{stim,tsim}\"",
     "build:test": "tsc src/stimEngine.ts src/tsim.ts --outDir dist-test --module nodenext --target ES2021 --moduleResolution nodenext --skipLibCheck",
     "test:engine": "npm run build:test && node --test test/engine.test.mjs test/tsim.test.mjs",
     "vscode:prepublish": "node esbuild.js --production"

@@ -14,6 +14,20 @@ import {
 import { getCircuitStats } from "../dist-test/stimEngine.js";
 import { renderDiagram, renderDiagramFull, withoutNoiseText } from "../dist-test/stimEngine.js";
 
+test(".tsim files share Stim's language registration and grammar", () => {
+  const manifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+  const languages = manifest.contributes.languages;
+  const stim = languages.find((language) => language.extensions.includes(".stim"));
+  const tsim = languages.filter((language) => language.extensions.includes(".tsim"));
+  assert.deepStrictEqual(tsim, [stim]);
+  assert.strictEqual(stim.id, "stim");
+  assert.ok(stim.aliases.includes("Tsim"));
+  assert.ok(manifest.activationEvents.includes("onLanguage:stim"));
+  assert.ok(manifest.contributes.grammars.some(
+    (grammar) => grammar.language === stim.id && grammar.scopeName === "source.stim"
+  ));
+});
+
 // --- lowering (shorthand -> tagged stim) ---
 
 test("lowers tsim shorthand to tagged stim", () => {
@@ -116,6 +130,20 @@ async function render(src, type) {
       : await renderDiagramFull(ph.text, type, 0); // all ticks, like tsim's default timeslice
   return relabelSvg(svg, ph.labels);
 }
+
+test("loads and renders a .tsim file with all additional Tsim instructions", async () => {
+  const text = readFileSync(new URL("./fixtures/non_clifford.tsim", import.meta.url), "utf8");
+  const stats = await getCircuitStats(shorthandToStim(text));
+  assert.strictEqual(stats.error, undefined);
+  assert.strictEqual(stats.qubits, 3);
+  assert.strictEqual(stats.measurements, 3);
+  for (const type of ["timeline-svg", "timeslice-svg"]) {
+    const svg = await render(text, type);
+    assert.match(svg, /<svg\b/);
+    assert.ok(svg.includes("TPP"));
+    assert.ok(svg.includes("0.25π"));
+  }
+});
 
 for (const type of ["timeline-svg", "timeslice-svg"]) {
   test(`render labels all single-qubit gates (${type})`, async () => {

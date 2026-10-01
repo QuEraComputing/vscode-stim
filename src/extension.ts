@@ -8,7 +8,7 @@ export function activate(context: vscode.ExtensionContext) {
       const editor = vscode.window.activeTextEditor;
       const lang = editor?.document.languageId;
       if (!editor || (lang !== "stim" && lang !== "dem")) {
-        vscode.window.showWarningMessage("Open a .stim or .dem file to visualize it.");
+        vscode.window.showWarningMessage("Open a .stim, .tsim, or .dem file to visualize it.");
         return;
       }
       StimPanel.createOrShow(context, editor.document);

@@ -1,0 +1,19 @@
+H 0 1 2
+T 0
+T_DAG 1
+TPP X0*Y1
+TPP_DAG Z0*X1
+TICK
+R_X(+.25) 0
+R_Y(-.5) 1
+R_Z(.125e+1) 2
+U3(+.5, -0.25, .125E-1) 0
+TICK
+R_XX(0.5) 0 1
+R_YY(-2.5e-1) 0 1
+R_ZZ(+1.) 0 2
+R_PAULI(4e-4) X0*Y1*Z2
+TICK
+CCZ 0 1 2
+CCX 0 1 2
+M 0 1 2
