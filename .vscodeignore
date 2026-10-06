@@ -2,6 +2,8 @@
 AGENTS.md
 .vscode/**
 .github/**
+.claude/**
+.ui-tests/**
 src/**
 test/**
 third_party/**
