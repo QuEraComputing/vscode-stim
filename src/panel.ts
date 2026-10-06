@@ -7,7 +7,7 @@ import {
   renderDiagram,
   renderDiagramFull,
   renderDemDiagram,
-  countTicks,
+  lastSliceTick,
   withoutNoiseText,
   getCircuitStats,
   getDemStats,
@@ -34,20 +34,6 @@ const TICK_DEPENDENT_BASES: BaseType[] = ["timeslice", "detslice"];
 
 // Bases that also have an interactive 3D form (the 2d|3d toggle).
 const DIM_CAPABLE_BASES: BaseType[] = ["timeline", "matchgraph"];
-
-// True if the last instruction, including inside a repeat, is a TICK (optionally
-// tagged, e.g. TICK[DISABLE_ERROR]). Such a trailing TICK leaves an empty final
-// time slice that stim's per-tick renderer can't draw (divide by zero).
-function endsWithTick(text: string): boolean {
-  const lines = text.split("\n");
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const hash = lines[i].indexOf("#");
-    const body = (hash >= 0 ? lines[i].slice(0, hash) : lines[i]).trim();
-    if (!body || body === "}") continue;
-    return /^TICK(\[[^\]]*\])?$/.test(body);
-  }
-  return false;
-}
 
 // A titled group of label/value rows in the info tooltip.
 interface StatSection {
@@ -84,6 +70,7 @@ export class StimPanel {
   private decomposeErrors = false; // matchgraph: split hyperedges into pairs
   private tick = 0; // slice index; stim ticks are 0-based (0 = first layer)
   private rows = 0; // full mode: layout rows (0 = stim auto)
+  private refreshSeq = 0; // bumped per refresh; superseded refreshes post nothing
   private disposables: vscode.Disposable[] = [];
 
   static createOrShow(context: vscode.ExtensionContext, doc: vscode.TextDocument) {
@@ -258,8 +245,9 @@ export class StimPanel {
   }
 
   async refresh() {
+    const seq = ++this.refreshSeq;
     if (this.kind === "dem") {
-      await this.refreshDem(this.doc.getText());
+      await this.refreshDem(this.doc.getText(), seq);
       return;
     }
     // Lower tsim shorthand (T, R_X, ...) to tagged stim. Used for every stim
@@ -268,14 +256,11 @@ export class StimPanel {
     try {
       text = shorthandToStim(this.doc.getText());
     } catch (e: any) {
-      this.postStats(null);
-      this.panel.webview.postMessage({
-        command: "error",
-        message: String(e?.message ?? e),
-      });
+      this.postStats(seq, null);
+      this.post(seq, { command: "error", message: String(e?.message ?? e) });
       return;
     }
-    void this.sendStats(text);
+    void this.sendStats(text, seq);
     const type = this.currentType();
     const dependent = this.isTickDependent();
     // tsim gates are relabeled only on the pure-layout op diagrams.
@@ -296,20 +281,21 @@ export class StimPanel {
         throw new Error(parseProblem);
       }
       // Slice diagrams index by tick. stim ticks are 0-based, so a circuit with
-      // N TICKs has slices 0..N (N+1 layers). Clamp to [0, count_ticks]; tick
-      // count_ticks+1 makes stim divide by zero. A circuit ending in a trailing
-      // TICK has an empty final slice (tick == count_ticks) that stim also can't
-      // render (divide by zero), so drop it from the range.
-      let tickMax = 0;
+      // N TICKs has slices 0..N (N+1 layers); tick N+1 makes stim divide by
+      // zero. Slices closed by trailing TICKs are empty (and stim can't render
+      // the final one), so lastSliceTick drops them from the range. Non-slice
+      // renders report no range (null).
+      let tickMax: number | null = null;
+      let tick = this.tick;
       if (dependent) {
-        tickMax = await countTicks(text);
+        tickMax = await lastSliceTick(text);
         if (tickMax < 0) {
           throw new Error("Circuit could not be parsed.");
         }
-        if (tickMax > 0 && endsWithTick(text)) {
-          tickMax -= 1;
+        tick = Math.min(Math.max(0, tick), tickMax);
+        if (seq === this.refreshSeq) {
+          this.tick = tick;
         }
-        this.tick = Math.min(Math.max(0, this.tick), tickMax);
       }
 
       // For relabeled diagrams, render placeholders then swap them for gate
@@ -326,38 +312,43 @@ export class StimPanel {
         const html = await renderDiagram(
           text, type, 0, withoutNoise, this.approxDisjoint, this.decomposeErrors
         );
-        this.panel.webview.postMessage({ command: "html", html, type });
+        this.post(seq, { command: "html", html, type });
       } else if (this.full && dependent) {
         // One combined diagram of every tick, laid out in `rows` rows.
         const svg = await renderDiagramFull(
           src, type, this.rows, withoutNoise, this.approxDisjoint, this.decomposeErrors
         );
-        this.panel.webview.postMessage({
+        this.post(seq, {
           command: "svg",
           svg: finish(svg),
           type,
-          tick: this.tick,
+          tick,
           tickMax,
           tickShown: false,
         });
       } else {
         const svg = await renderDiagram(
-          src, type, this.tick, withoutNoise, this.approxDisjoint, this.decomposeErrors
+          src, type, tick, withoutNoise, this.approxDisjoint, this.decomposeErrors
         );
-        this.panel.webview.postMessage({
+        this.post(seq, {
           command: "svg",
           svg: finish(svg),
           type,
-          tick: this.tick,
+          tick,
           tickMax,
           tickShown: dependent,
         });
       }
     } catch (e: any) {
-      this.panel.webview.postMessage({
-        command: "error",
-        message: String(e?.message ?? e),
-      });
+      this.post(seq, { command: "error", message: String(e?.message ?? e) });
+    }
+  }
+
+  // Post a refresh result unless a newer refresh has started since, so a slow
+  // render or stats call can't overwrite what a later refresh already showed.
+  private post(seq: number, msg: object) {
+    if (seq === this.refreshSeq) {
+      this.panel.webview.postMessage(msg);
     }
   }
 
@@ -369,26 +360,26 @@ export class StimPanel {
   }
 
   // Render the match graph straight from a detector error model.
-  private async refreshDem(text: string) {
-    void this.sendDemStats(text);
+  private async refreshDem(text: string, seq: number) {
+    void this.sendDemStats(text, seq);
     const type: DemDiagramType = this.effectiveThreeD()
       ? "matchgraph-3d-html"
       : "matchgraph-svg";
     try {
       const out = await renderDemDiagram(text, type);
       if (isHtmlDiagram(type)) {
-        this.panel.webview.postMessage({ command: "html", html: out, type });
+        this.post(seq, { command: "html", html: out, type });
       } else {
-        this.panel.webview.postMessage({ command: "svg", svg: out, type, tickShown: false });
+        this.post(seq, { command: "svg", svg: out, type, tickShown: false });
       }
     } catch (e: any) {
-      this.panel.webview.postMessage({ command: "error", message: String(e?.message ?? e) });
+      this.post(seq, { command: "error", message: String(e?.message ?? e) });
     }
   }
 
   // Post titled sections to the info tooltip (null = parse error).
-  private postStats(sections: StatSection[] | null) {
-    this.panel.webview.postMessage({ command: "stats", sections });
+  private postStats(seq: number, sections: StatSection[] | null) {
+    this.post(seq, { command: "stats", sections });
   }
 
   // Format the shortest graphlike error (graphlike distance); -1 means stim
@@ -399,11 +390,11 @@ export class StimPanel {
 
   // Send circuit summary counts to the webview's info tooltip. When the match
   // graph is selected, add a "Detector Error Model" section with its stats.
-  private async sendStats(text: string) {
+  private async sendStats(text: string, seq: number) {
     try {
       const s = await getCircuitStats(text);
       if (s.error) {
-        this.postStats(null);
+        this.postStats(seq, null);
         return;
       }
       const sections: StatSection[] = [
@@ -435,21 +426,21 @@ export class StimPanel {
           // Leave the circuit section as-is if the DEM build fails.
         }
       }
-      this.postStats(sections);
+      this.postStats(seq, sections);
     } catch {
       // Ignore; the tooltip just keeps its previous content.
     }
   }
 
   // Send detector-error-model counts to the webview's info tooltip.
-  private async sendDemStats(text: string) {
+  private async sendDemStats(text: string, seq: number) {
     try {
       const s = await getDemStats(text);
       if (s.error) {
-        this.postStats(null);
+        this.postStats(seq, null);
         return;
       }
-      this.postStats([
+      this.postStats(seq, [
         {
           title: "Detector Error Model",
           rows: [

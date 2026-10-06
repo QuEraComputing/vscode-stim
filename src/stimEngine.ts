@@ -246,3 +246,58 @@ export async function countTicks(circuitText: string): Promise<number> {
     throw new Error(`stim failed to count ticks: ${String(e?.message ?? e)}`);
   }
 }
+
+type TickItem = "tick" | "op" | { reps: number; body: TickItem[] };
+
+// Number of TICKs at the very end of the circuit's instruction stream, with
+// REPEAT blocks unrolled. Each one closes an empty trailing slice. Gate names
+// are case-insensitive, as in stim. Expects text that stim already parsed.
+export function countTrailingTicks(circuitText: string): number {
+  const root: TickItem[] = [];
+  const stack: TickItem[][] = [root];
+  for (const raw of circuitText.split("\n")) {
+    // Drop tags before comments: a tag may itself contain '#'.
+    const untagged = raw.replace(/\[[^\]\n]*\]/g, "");
+    const hash = untagged.indexOf("#");
+    const line = (hash >= 0 ? untagged.slice(0, hash) : untagged).trim();
+    if (!line) continue;
+    const repeat = /^REPEAT\s+(\d+)\s*\{$/i.exec(line);
+    if (repeat) {
+      const block = { reps: Number(repeat[1]), body: [] as TickItem[] };
+      stack[stack.length - 1].push(block);
+      stack.push(block.body);
+    } else if (line === "}") {
+      if (stack.length > 1) stack.pop();
+    } else {
+      stack[stack.length - 1].push(/^TICK$/i.test(line) ? "tick" : "op");
+    }
+  }
+  // Walk back from the end. A block made only of TICKs contributes every
+  // iteration; otherwise only its last iteration's trailing TICKs count.
+  const trailing = (items: TickItem[]): { ticks: number; onlyTicks: boolean } => {
+    let ticks = 0;
+    for (let i = items.length - 1; i >= 0; i--) {
+      const item = items[i];
+      if (item === "tick") {
+        ticks++;
+      } else if (item === "op") {
+        return { ticks, onlyTicks: false };
+      } else {
+        const inner = trailing(item.body);
+        if (!inner.onlyTicks) return { ticks: ticks + inner.ticks, onlyTicks: false };
+        ticks += inner.ticks * item.reps;
+      }
+    }
+    return { ticks, onlyTicks: true };
+  };
+  return trailing(root).ticks;
+}
+
+// Last slice index worth showing (-1 if the circuit cannot be parsed). stim
+// numbers slices 0..count_ticks, but slices closed by trailing TICKs are empty,
+// and stim's timeslice renderer traps on a final empty slice, so drop them.
+export async function lastSliceTick(circuitText: string): Promise<number> {
+  const ticks = await countTicks(circuitText);
+  if (ticks < 0) return -1;
+  return Math.max(0, ticks - countTrailingTicks(circuitText));
+}

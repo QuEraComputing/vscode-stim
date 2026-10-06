@@ -45,6 +45,17 @@ test("lowers tsim shorthand to tagged stim", () => {
   assert.strictEqual(shorthandToStim("H 0\nCX 0 1\nTICK\n"), "H 0\nCX 0 1\nTICK\n");
 });
 
+test("tsim lowering errors quote the offending line", () => {
+  assert.throws(
+    () => shorthandToStim("H 0\nCCX 0 1  # bad\nM 0"),
+    { message: "Circuit could not be parsed. CCX expects bare qubit integer targets in groups of three on the following line:\n  CCX 0 1" }
+  );
+  assert.throws(
+    () => shorthandToStim("H 0\nR_XX(0.25) 0 0\n"),
+    { message: "Circuit could not be parsed. R_XX target qubits must be distinct on the following line:\n  R_XX(0.25) 0 0" }
+  );
+});
+
 // --- _parse_parametric_tag (port of test_parse_parametric_tag_accepts_scientific_notation) ---
 
 test("parseParametricTag accepts scientific notation", () => {

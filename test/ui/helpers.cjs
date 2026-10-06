@@ -1,6 +1,9 @@
 const path = require("node:path");
 const fs = require("node:fs/promises");
-const { By, until, VSBrowser, WebView, Workbench, TextEditor } = require("vscode-extension-tester");
+const { before, beforeEach, afterEach } = require("mocha");
+const {
+  By, until, VSBrowser, WebView, Workbench, TextEditor, EditorView,
+} = require("vscode-extension-tester");
 
 const workspace = path.resolve(".ui-tests/workspace");
 const driver = () => VSBrowser.instance.driver;
@@ -54,22 +57,70 @@ async function openVisualizer(name) {
   await view.switchToFrame(15000);
   await waitForSvg();
   if (!name.endsWith(".dem")) {
+    // Toolbar choices persist across panels. The full toggle only shows its
+    // state on a slice base, so reset it there before returning to timeline.
+    await selectBase("timeslice");
+    await setToggle("#toggle-full", false);
     await selectBase("timeline");
     await setToggle("#toggle-noise", false);
-    await setToggle("#toggle-full", false);
   }
   return view;
 }
 
+// Replace a workspace file's text in the editor and save it, which refreshes
+// the visualizer, then switch back into the webview. Reuses the file's editor
+// in the left group: reopening the file would add a second editor beside the
+// webview, and the two race for focus.
+async function editAndSave(view, name, text) {
+  await view.switchBack();
+  const editor = await new EditorView().openEditor(name, 0);
+  await editor.setText(text);
+  await editor.save();
+  await view.switchToFrame(15000);
+}
+
+// Best effort: a broken driver or detached frame must not fail the afterEach
+// hook, which would skip the rest of the suite and hide the real failure.
 async function captureFailure(test) {
   const name = test.fullTitle().replace(/[^a-z0-9]+/gi, "-");
   const folder = path.resolve(".ui-tests/diagnostics");
-  await fs.mkdir(folder, { recursive: true });
-  await fs.writeFile(path.join(folder, `${name}.html`), await driver().getPageSource());
-  await VSBrowser.instance.takeScreenshot(name);
+  try {
+    await fs.mkdir(folder, { recursive: true });
+    await fs.writeFile(path.join(folder, `${name}.html`), await driver().getPageSource());
+  } catch (e) {
+    console.warn(`Could not save a DOM snapshot for "${test.fullTitle()}": ${e}`);
+  }
+  try {
+    await VSBrowser.instance.takeScreenshot(name);
+  } catch (e) {
+    console.warn(`Could not take a screenshot for "${test.fullTitle()}": ${e}`);
+  }
+}
+
+// Start every test from the workbench with no editors open, and keep
+// diagnostics for failures. Call inside a describe block.
+function useEditorHooks() {
+  before(async () => {
+    // Monaco only reports editor focus while the page is focused. Emulate that,
+    // so a local run doesn't fail when another app takes the foreground.
+    await driver().sendDevToolsCommand("Emulation.setFocusEmulationEnabled", { enabled: true });
+  });
+
+  beforeEach(async () => {
+    await driver().switchTo().defaultContent();
+    await new EditorView().closeAllEditors();
+  });
+
+  afterEach(async function () {
+    try {
+      if (this.currentTest.state === "failed") await captureFailure(this.currentTest);
+    } finally {
+      await driver().switchTo().defaultContent();
+    }
+  });
 }
 
 module.exports = {
   workspace, driver, find, prepareWorkspace, waitForSvg, renderAfter,
-  setToggle, selectBase, openVisualizer, captureFailure,
+  setToggle, selectBase, openVisualizer, editAndSave, useEditorHooks,
 };
