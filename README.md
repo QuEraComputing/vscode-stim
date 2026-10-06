@@ -72,16 +72,16 @@ npm run test:engine   # engine wrapper tests
 
 ## Release
 
-VSIX files are built by GitHub Actions and must not be committed. To publish a release, push a version tag:
+GitHub Actions tests and packages the extension, attaches the VSIX to a GitHub release, and publishes the same package to Open VSX and the VS Code Marketplace. Complete the [one-time publisher setup](.github/RELEASING.md) first.
+
+Update `package.json` and `package-lock.json` to the next numeric `major.minor.patch` version, commit and push the changes, then push the matching tag. For example, for version `0.1.1`:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
-The release workflow packages the extension and attaches the generated VSIX to the GitHub release.
-
-To publish to the VS Code Marketplace, upload that VSIX through the [QuEra Computing publisher portal](https://marketplace.visualstudio.com/manage/publishers/QuEraComputing). GitHub releases do not automatically publish to the Marketplace. The package version must match the tag and use a numeric `major.minor.patch` version.
+The workflow rejects tags that do not match the package version. Registry publishing runs in independent jobs; rerun failed jobs after resolving any authentication errors. Already published versions are skipped. A manual run on a branch only builds a VSIX unless the Marketplace setup check is selected; that check authenticates without publishing. VSIX files must not be committed.
 
 ## Notes
 
