@@ -5,22 +5,47 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      marketplace_setup:
+        description: Check Entra login and print the Marketplace identity ID without publishing
+        type: boolean
+        default: false
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   vsix:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
           lfs: true
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+
+      - name: Check release version
+        run: |
+          node <<'NODE'
+          const { version } = require('./package.json');
+          if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) {
+            throw new Error('package.json version must be numeric major.minor.patch');
+          }
+          if (process.env.GITHUB_REF_TYPE === 'tag' && process.env.GITHUB_REF_NAME !== `v${version}`) {
+            throw new Error(`Release tag must be v${version}, got ${process.env.GITHUB_REF_NAME}`);
+          }
+          NODE
 
       - run: npm ci
 
@@ -41,9 +66,92 @@ jobs:
         with:
           name: vscode-stim-vsix
           path: vscode-stim.vsix
+          if-no-files-found: error
 
       - name: Attach VSIX to GitHub release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.marketplace_setup
         uses: softprops/action-gh-release@v2
         with:
           files: vscode-stim.vsix
+          fail_on_unmatched_files: true
+
+  publish-openvsx:
+    needs: vsix
+    if: startsWith(github.ref, 'refs/tags/') && !inputs.marketplace_setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: vscode-stim-vsix
+
+      - name: Publish to Open VSX
+        run: npx --no-install ovsx publish vscode-stim.vsix --trusted-publishing --skip-duplicate
+
+  publish-marketplace:
+    needs: vsix
+    if: startsWith(github.ref, 'refs/tags/') || inputs.marketplace_setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: vscode-marketplace
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check Marketplace configuration
+        env:
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+        run: |
+          if [[ -z "$AZURE_CLIENT_ID" || -z "$AZURE_TENANT_ID" ]]; then
+            echo '::error::Set AZURE_CLIENT_ID and AZURE_TENANT_ID in the vscode-marketplace environment variables.'
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: vscode-stim-vsix
+
+      - name: Sign in to Microsoft Entra
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      - name: Show Marketplace identity ID
+        if: inputs.marketplace_setup
+        run: >-
+          az rest
+          --url https://app.vssps.visualstudio.com/_apis/profile/profiles/me
+          --resource 499b84ac-1321-427f-aa17-267ca6975798
+          --query id --output tsv
+
+      - name: Publish to VS Code Marketplace
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.marketplace_setup
+        run: npx --no-install vsce publish --packagePath vscode-stim.vsix --azure-credential --skip-duplicate

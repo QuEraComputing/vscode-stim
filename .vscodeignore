@@ -2,6 +2,8 @@
 AGENTS.md
 .vscode/**
 .github/**
+.claude/**
+.ui-tests/**
 src/**
 test/**
 third_party/**
@@ -19,6 +21,4 @@ dist-test/**
 .git*
 e2e_tmp.mjs
 **/*.map
-.ui-tests/**
-.claude/**
 extester.config.json
