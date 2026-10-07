@@ -70,6 +70,21 @@ npm run test:wasm     # WebAssembly engine smoke tests
 npm run test:engine   # engine wrapper tests
 ```
 
+### UI tests
+
+The UI suite uses [VS Code Extension Tester](https://github.com/redhat-developer/vscode-extension-tester) and Mocha to drive a real VS Code window with Selenium. It packages and installs the extension into an isolated test profile, then exercises `.stim`, `.tsim`, and `.dem` files, SVG controls, zoom/pan, and error recovery on save.
+
+With Node.js 22+ and a graphical desktop, run:
+
+```bash
+npm ci
+npm run test:ui
+```
+
+On headless Linux, use `xvfb-run -a npm run test:ui`. The first run downloads the VS Code and ChromeDriver versions selected in `extester.config.json`; later runs reuse those downloads. Your normal VS Code profile and extensions are not modified. Test files are copied into `.ui-tests/workspace` before editing.
+
+The suite intentionally excludes CDN-dependent 3D views and OS clipboard integration. Failures produce screenshots, DOM snapshots, and VS Code/WebDriver logs under `.ui-tests/`; CI uploads these as the `ui-test-diagnostics` artifact. Runtime downloads and test artifacts are ignored by Git and excluded from the VSIX.
+
 ## Release
 
 GitHub Actions tests and packages the extension, attaches the VSIX to a GitHub release, and publishes the same package to Open VSX and the VS Code Marketplace. Complete the [one-time publisher setup](.github/RELEASING.md) first.

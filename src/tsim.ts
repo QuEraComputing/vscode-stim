@@ -49,6 +49,12 @@ function controlledDecomposition(
   return gate === "CCZ" ? ccz : [`${t("H")} ${c}`, ...ccz, `${t("H")} ${c}`];
 }
 
+// A tsim instruction that can't be lowered, reported like explainStimError
+// does for stim parse errors: the reason, then the offending source.
+function loweringError(reason: string, source: string): Error {
+  return new Error(`Circuit could not be parsed. ${reason} on the following line:\n  ${source.trim()}`);
+}
+
 function expandControlledGates(text: string): string {
   const out: string[] = [];
   for (const line of text.split("\n")) {
@@ -63,7 +69,7 @@ function expandControlledGates(text: string): string {
     const [, indent, gate, tag, targetsText] = m;
     const targets = targetsText.split(/\s+/);
     if (targets.length % 3 !== 0 || !targets.every((t) => /^\d+$/.test(t))) {
-      throw new Error(`${gate} expects bare qubit integer targets in groups of three.`);
+      throw loweringError(`${gate} expects bare qubit integer targets in groups of three`, body);
     }
     if (comment) {
       out.push(`${indent}${comment}`);
@@ -92,8 +98,8 @@ export function shorthandToStim(text: string): string {
   text = text.replace(/(?<!\[)\bT(?:\[([^\]\n]*)\])?(?!\w)/g, (_m, u) => `S[${encodeTTag(u || "")}]`);
   text = text.replace(
     new RegExp(`\\bR_([XYZ])\\1\\((${FLOAT})\\)\\s+(\\d+)\\s+(\\d+)`, "g"),
-    (_m, p, a, q0, q1) => {
-      if (q0 === q1) throw new Error(`R_${p}${p} target qubits must be distinct, got ${q0} ${q1}.`);
+    (m, p, a, q0, q1) => {
+      if (q0 === q1) throw loweringError(`R_${p}${p} target qubits must be distinct`, m);
       return `SPP[R_PAULI(theta=${parseFloat(a)}*pi)] ${p}${q0}*${p}${q1}`;
     }
   );

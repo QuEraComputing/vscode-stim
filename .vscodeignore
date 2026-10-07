@@ -21,3 +21,4 @@ dist-test/**
 .git*
 e2e_tmp.mjs
 **/*.map
+extester.config.json

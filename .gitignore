@@ -5,3 +5,4 @@ third_party/Stim/build/
 dist-test/
 .DS_Store
 useful_files/
+.ui-tests/

@@ -100,6 +100,7 @@
     "test:grammar": "vscode-tmgrammar-test \"test/grammar/*.{stim,tsim}\"",
     "build:test": "tsc src/stimEngine.ts src/tsim.ts --outDir dist-test --module nodenext --target ES2021 --moduleResolution nodenext --skipLibCheck",
     "test:engine": "npm run build:test && node --test test/engine.test.mjs test/tsim.test.mjs",
+    "test:ui": "extest setup-and-run",
     "vscode:prepublish": "node esbuild.js --production"
   },
   "devDependencies": {
@@ -107,8 +108,10 @@
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.6.0",
     "esbuild": "^0.28.1",
+    "mocha": "12.0.2",
     "ovsx": "1.2.0",
     "typescript": "^5.4.0",
+    "vscode-extension-tester": "8.27.0",
     "vscode-tmgrammar-test": "^0.1.3"
   },
   "dependencies": {
