@@ -2,7 +2,7 @@
 
 Syntax highlighting and interactive circuit visualization for [Stim](https://github.com/quantumlib/Stim) and [Tsim](https://github.com/QuEraComputing/tsim) circuits in `.stim` and `.tsim` files, plus `.dem` detector error models.
 
-Diagrams are produced by Stim's C++ core compiled to WebAssembly and run entirely inside the editor with no Python or native dependencies. The bundled [QuEra Stim fork](https://github.com/QuEraComputing/Stim) draws non-Clifford gates natively; see [Tsim support](#tsim-support) for view-specific limits.
+Diagrams are produced by Stim's C++ core compiled to WebAssembly and run entirely inside the editor with no Python or native dependencies. Non-Clifford gates are drawn natively; see [Tsim support](#tsim-support) for view-specific limits.
 
 ## Features
 
@@ -48,9 +48,9 @@ The `.stim` and `.tsim` extensions share the same language mode, syntax highligh
 
 The grammar highlights all additional instructions currently documented by [Tsim](https://github.com/QuEraComputing/tsim#supported-instructions): `T`, `T_DAG`, `TPP`, `TPP_DAG`, `R_X`, `R_Y`, `R_Z`, `R_XX`, `R_YY`, `R_ZZ`, `R_PAULI`, `U3`, `CCZ`, and `CCX`. Signed decimal and scientific-notation arguments, Pauli-product targets, and instruction tags are highlighted too.
 
-The bundled QuEra Stim fork renders all of these instructions directly in 2D timeline and time-slice views, including controlled gates and Pauli-product rotations. Rotation angles are in half-turns (multiply by π for radians). Older circuits that encode Tsim gates in Stim tags are still supported.
+All of these instructions render directly in 2D timeline and time-slice views, including controlled gates and Pauli-product rotations. Rotation angles are in half-turns (multiply by π for radians). Older circuits that encode Tsim gates in Stim tags are still supported.
 
-Autocomplete, hover documentation, and signature help use the fork's complete gate table, including non-Clifford instructions and aliases such as `R_PAULI` and `U`.
+Autocomplete, hover documentation, and signature help cover the complete gate table, including non-Clifford instructions and aliases such as `R_PAULI` and `U`.
 
 Detector slices and matching graphs require Clifford circuits and report errors for native non-Clifford gates. Gates written in the older tagged form (for example `S[T]` or `I[R_X(theta=0.25*pi)]`) stay tagged in these views, so they render as their Clifford stand-ins. The 3D timeline also renders all of these gates, including rotation angles and controlled-gate connections. `TPP`, `TPP_DAG`, `R_XX`, `R_YY`, `R_ZZ`, and `R_PAULI`/`RPP` are visualization-only instructions; this extension does not expose a circuit simulator.
 
