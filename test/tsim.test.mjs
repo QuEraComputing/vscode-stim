@@ -1,18 +1,11 @@
 import { test } from "node:test";
-import assert from "node:assert";
+import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { toNativeStim, findGateLines, explainStimError } from "../dist-test/tsim.js";
 import {
-  shorthandToStim,
-  toPlaceholders,
-  relabelSvg,
-  placeholdersToT,
-  parseParametricTag,
-  findGateLines,
-  explainStimError,
-} from "../dist-test/tsim.js";
-import { getCircuitStats } from "../dist-test/stimEngine.js";
-import { renderDiagram, renderDiagramFull, withoutNoiseText } from "../dist-test/stimEngine.js";
+  getCircuitStats, getCircuitDemStats, getGateData,
+  renderDiagram, renderDiagramFull,
+} from "../dist-test/stimEngine.js";
 
 test(".tsim files share Stim's language registration and grammar", () => {
   const manifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
@@ -28,32 +21,21 @@ test(".tsim files share Stim's language registration and grammar", () => {
   ));
 });
 
-// --- lowering (shorthand -> tagged stim) ---
-
-test("lowers tsim shorthand to tagged stim", () => {
-  assert.match(shorthandToStim("T 0 1"), /S\[T\] 0 1/);
-  assert.match(shorthandToStim("T_DAG 1"), /S_DAG\[T\] 1/);
-  assert.match(shorthandToStim("TPP X0*Y1"), /SPP\[T\] X0\*Y1/);
-  assert.match(shorthandToStim("TPP_DAG Z0*X1"), /SPP_DAG\[T\] Z0\*X1/);
-  assert.match(shorthandToStim("R_X(0.5) 0"), /I\[R_X\(theta=0\.5\*pi\)\] 0/);
-  assert.match(shorthandToStim("R_ZZ(0.25) 0 1"), /SPP\[R_PAULI\(theta=0\.25\*pi\)\] Z0\*Z1/);
-  assert.match(
-    shorthandToStim("U3(0.1, 0.2, 0.3) 0"),
-    /I\[U3\(theta=0\.1\*pi, phi=0\.2\*pi, lambda=0\.3\*pi\)\]/
-  );
-  assert.match(shorthandToStim("CCZ 0 1 2"), /S\[T\]/);
-  assert.strictEqual(shorthandToStim("H 0\nCX 0 1\nTICK\n"), "H 0\nCX 0 1\nTICK\n");
+test("native Tsim instructions, user tags and comments pass through unchanged", () => {
+  const text = readFileSync(new URL("./fixtures/non_clifford.tsim", import.meta.url), "utf8");
+  assert.equal(toNativeStim(text), text);
+  const tagged = "R_Z[calibration R_X(0.3)](0.25) 0 # T 1\nH[T] 0\n# TPP X0*Z1";
+  assert.equal(toNativeStim(tagged), tagged);
 });
 
-// --- _parse_parametric_tag (port of test_parse_parametric_tag_accepts_scientific_notation) ---
-
-test("parseParametricTag accepts scientific notation", () => {
-  assert.deepStrictEqual(parseParametricTag("R_Z(theta=2.5e-1*pi)"), ["R_Z", { theta: 0.25 }]);
-  assert.deepStrictEqual(parseParametricTag("R_X(theta=1.5E+0*pi)"), ["R_X", { theta: 1.5 }]);
-  assert.deepStrictEqual(parseParametricTag("R_Y(theta=-2.5e-1*pi)"), ["R_Y", { theta: -0.25 }]);
+test("decodes legacy tagged gates without decompositions or placeholders", () => {
+  assert.equal(toNativeStim("S[T] 0\nS_DAG[T:user] 1"), "T 0\nT_DAG[user] 1");
+  assert.equal(toNativeStim("SPP[T] X0*Y1\nSPP_DAG[T:user] Z0"), "TPP X0*Y1\nTPP_DAG[user] Z0");
+  assert.equal(toNativeStim("I[R_Z(theta=2.5e-1*pi)] 0"), "R_Z(2.5e-1) 0");
+  assert.equal(toNativeStim("I[U3(theta=0.1*pi, phi=0.2*pi, lambda=-0.3*pi)] 0"), "U3(0.1, 0.2, -0.3) 0");
+  assert.equal(toNativeStim("SPP[R_PAULI(theta=0.25*pi)] X0*Y1"), "R_PAULI(0.25) X0*Y1");
+  assert.equal(toNativeStim("I[XYZ(theta=0.1*pi)] 0"), "I[XYZ(theta=0.1*pi)] 0");
 });
-
-// --- mapping stim's parse error to the offending line ---
 
 test("findGateLines matches the instruction token, with or without a tag", () => {
   const text = "H 0\nRJK 0 1\nM 0\nRJK[foo] 2\nRJKX 3";
@@ -79,147 +61,81 @@ test("explainStimError falls back to stim's reason when no line is found", () =>
   assert.match(msg, /Circuit could not be parsed: Two qubit gate CX requires/);
 });
 
-// Integration: stim's real error mapped back to the offending fixture line.
-test("explainStimError points at the offending line in a fixture", async () => {
-  const fixture = fileURLToPath(new URL("./fixtures/parametric_unset.stim", import.meta.url));
-  const lowered = shorthandToStim(readFileSync(fixture, "utf8"));
-  const stats = await getCircuitStats(lowered);
-  const msg = explainStimError(lowered, stats.error);
-  assert.match(msg, /R_Z\(\{physical_angle\}\) 0/);
+test("unresolved parameters still produce a parse error", async () => {
+  const text = readFileSync(new URL("./fixtures/parametric_unset.stim", import.meta.url), "utf8");
+  const stats = await getCircuitStats(toNativeStim(text));
+  assert.ok(stats.error);
+  assert.match(explainStimError(text, stats.error), /Circuit could not be parsed/);
 });
 
-// --- placeholders_to_t (port of test_placeholders_replace_err_and_annotation_removed) ---
-
-test("placeholdersToT replaces ERR box and removes the red id", () => {
-  const id = 0.123456;
-  const svg = `<svg viewBox="0 0 10 10"><text x="5" y="5"><tspan>I</tspan></text><text stroke="red">${id}</text></svg>`;
-  const result = placeholdersToT(svg, new Map([[id, { label: "T" }]]));
-  assert.ok(result.includes("T"));
-  assert.ok(!result.includes('stroke="red"'));
-  assert.ok(!result.includes("<tspan>I</tspan>"));
-});
-
-// --- toPlaceholders (port of the tagged_gates_to_placeholder tests) ---
-
-test("toPlaceholders maps a parametric gate and emits I_ERROR", () => {
-  const ph = toPlaceholders("I[R_Z(theta=0.25*pi)] 0");
-  assert.strictEqual(ph.labels.size, 1);
-  assert.ok(ph.text.includes("I_ERROR"));
-});
-
-test("toPlaceholders passes an unknown parametric gate through unchanged", () => {
-  const ph = toPlaceholders("I[XYZ(theta=0.1*pi)] 0 1 2");
-  assert.strictEqual(ph.labels.size, 0);
-  assert.strictEqual(ph.text, "I[XYZ(theta=0.1*pi)] 0 1 2");
-});
-
-test("toPlaceholders handles scientific-notation angle and subscripts the axis", () => {
-  const ph = toPlaceholders("I[R_Z(theta=2.5e-1*pi)] 0");
-  const label = [...ph.labels.values()][0];
-  assert.ok(label.label.includes("Z"));
-  assert.strictEqual(label.annotation, "0.25π");
-});
-
-// --- integration: full render + relabel (port of the render_svg_* tests) ---
-
-async function render(src, type) {
-  const ph = toPlaceholders(shorthandToStim(src));
-  const svg =
-    type === "timeline-svg"
-      ? await renderDiagram(ph.text, type, 0)
-      : await renderDiagramFull(ph.text, type, 0); // all ticks, like tsim's default timeslice
-  return relabelSvg(svg, ph.labels);
-}
-
-test("loads and renders a .tsim file with all additional Tsim instructions", async () => {
+test("parses and renders all Tsim instructions directly in WASM", async () => {
   const text = readFileSync(new URL("./fixtures/non_clifford.tsim", import.meta.url), "utf8");
-  const stats = await getCircuitStats(shorthandToStim(text));
-  assert.strictEqual(stats.error, undefined);
-  assert.strictEqual(stats.qubits, 3);
-  assert.strictEqual(stats.measurements, 3);
+  const stats = await getCircuitStats(text);
+  assert.equal(stats.error, undefined);
+  assert.equal(stats.qubits, 3);
+  assert.equal(stats.measurements, 3);
   for (const type of ["timeline-svg", "timeslice-svg"]) {
-    const svg = await render(text, type);
+    const svg = await renderDiagramFull(text, type, 0);
     assert.match(svg, /<svg\b/);
     assert.ok(svg.includes("TPP"));
-    assert.ok(svg.includes("0.25π"));
+    assert.ok(svg.includes("TPP†"));
+    assert.ok(!svg.includes("ERR"));
+    assert.ok(!svg.includes("SPP"));
   }
 });
 
-for (const type of ["timeline-svg", "timeslice-svg"]) {
-  test(`render labels all single-qubit gates (${type})`, async () => {
-    const html = await render(
-      `
-        S[T] 0
-        TICK
-        S_DAG[T] 1
-        TICK
-        I[R_Z(theta=0.25*pi)] 0
-        I[R_X(theta=0.5*pi)] 1
-        I[R_Y(theta=-0.75*pi)] 2
-        TICK
-        I[U3(theta=0.1*pi, phi=0.2*pi, lambda=0.3*pi)] 0
-      `,
-      type
-    );
-    assert.ok(html.includes("T"));
-    assert.ok(html.includes('<tspan baseline-shift="super" font-size="14">†</tspan>'));
-    assert.ok(html.includes('<tspan baseline-shift="sub" font-size="14">Z</tspan>'));
-    assert.ok(html.includes('<tspan baseline-shift="sub" font-size="14">X</tspan>'));
-    assert.ok(html.includes('<tspan baseline-shift="sub" font-size="14">Y</tspan>'));
-    assert.ok(html.includes("0.25π"));
-    assert.ok(html.includes("0.5π"));
-    assert.ok(html.includes("-0.75π"));
-    assert.ok(html.includes('<tspan baseline-shift="sub" font-size="14">3</tspan>'));
-  });
-
-  test(`render TPP labels (${type})`, async () => {
-    const html = await render(
-      `
-        TPP X0*Y1*Z2
-        TICK
-        TPP_DAG Z0*X1
-      `,
-      type
-    );
-    assert.ok(html.includes("TPP"));
-    assert.ok(html.includes("TPP†"));
-    assert.ok(html.includes('<tspan baseline-shift="sub" font-size="10">X</tspan>'));
-    assert.ok(html.includes('<tspan baseline-shift="sub" font-size="10">Y</tspan>'));
-    assert.ok(html.includes('<tspan baseline-shift="sub" font-size="10">Z</tspan>'));
-    assert.ok(!html.includes("SPP"));
-  });
-}
-
-test("render keeps a real SPP while relabeling TPP", async () => {
-  const html = await render(
-    `
-      SPP X0*Z1
-      TICK
-      TPP Y0*Z1
-    `,
-    "timeline-svg"
-  );
-  assert.ok(html.includes("SPP"));
-  assert.ok(html.includes("TPP"));
+test("renders native non-Clifford gates and preserves them when hiding noise", async () => {
+  const text = "H 0 1 2\nT 0\nT_DAG 1\nR_X(0.25) 0\nU3(0.1, 0.2, 0.3) 1\nCS 0 1\nCS_DAG 1 2\nCCZ 0 1 2\nCCX 0 1 2\nX_ERROR(0.125) 0";
+  const svg = await renderDiagram(text, "timeline-svg", 0, true);
+  assert.match(svg, /<svg/);
+  assert.ok(svg.includes("0.25"));
+  assert.ok(!svg.includes("ERR"));
+  assert.ok(!svg.includes("0.125"));
+  const stats = await getCircuitStats(text);
+  assert.equal(stats.error, undefined);
 });
 
-test("render shows the repeat-block label", async () => {
-  const html = await render(
-    `
-      T 0
-      REPEAT 100 {
-          T 0
-      }
-    `,
-    "timeline-svg"
-  );
-  assert.ok(html.includes("REP100"));
+test("draw-only and native non-Clifford gates are rejected by Clifford-only views", async () => {
+  for (const gate of ["T 0", "TPP X0*Y1", "TPP_DAG X0*Y1", "R_XX(0.25) 0 1", "R_YY(0.25) 0 1", "R_PAULI(0.25) X0*Y1"]) {
+    const text = `${gate}\nTICK\nM 0\nDETECTOR rec[-1]`;
+    for (const type of ["detslice-svg", "detslice-with-ops-svg", "matchgraph-svg"]) {
+      await assert.rejects(() => renderDiagram(text, type, 0), /Clifford|draw-only/);
+    }
+    assert.match((await getCircuitDemStats(text, true, false)).error, /Clifford|draw-only/);
+  }
 });
 
-// --- without-noise interaction ---
+test("gate metadata includes the fork's full native gate list and aliases", async () => {
+  const gates = await getGateData();
+  assert.equal(new Set(gates.map(g => g.name)).size, gates.length);
+  assert.ok(!gates.some(g => g.name === "NOT_A_GATE"));
+  for (const name of ["T", "T_DAG", "TPP", "TPP_DAG", "CS", "CS_DAG", "CCZ", "CCX", "R_X", "R_Y", "R_Z", "R_XX", "R_YY", "R_ZZ", "RPP", "R_PAULI", "U3", "U", "CNOT"]) {
+    const g = gates.find(g => g.name === name);
+    assert.ok(g, `missing ${name}`);
+    assert.ok(g.help.length > 0, `missing help for ${name}`);
+    assert.ok(g.category.length > 0);
+  }
+  assert.equal(gates.find(g => g.name === "R_XX").args, 1);
+  assert.equal(gates.find(g => g.name === "U").args, 3);
+  assert.equal(gates.find(g => g.name === "TPP").args, 0);
+  assert.match(gates.find(g => g.name === "R_PAULI").help, /draw-only/);
+});
 
-test("withoutNoiseText strips noise but keeps tsim gates", async () => {
-  const out = await withoutNoiseText(shorthandToStim("T 0\nX_ERROR(0.1) 0\n"));
-  assert.match(out, /S\[T\] 0/);
-  assert.ok(!out.includes("X_ERROR"));
+
+test("3D timeline exports native Tsim gates, angles, and controlled endpoints", async () => {
+  const text = readFileSync(new URL("./fixtures/non_clifford.tsim", import.meta.url), "utf8");
+  const html = await renderDiagram(text + "\nCS 0 1\nCS_DAG 1 2", "timeline-3d-html", 0);
+  assert.match(html, /<!DOCTYPE html>/);
+  const uri = /data:text\/plain;base64,([A-Za-z0-9+/=]+)/.exec(html);
+  assert.ok(uri, "missing embedded glTF export");
+  const gltf = JSON.parse(Buffer.from(uri[1], "base64").toString("utf8"));
+  assert.equal(gltf.asset.version, "2.0");
+  for (const name of ["R_X", "R_Y", "R_Z", "U3", "R_XX", "R_YY", "R_ZZ", "RPP:X", "TPP:X", "TPP_DAG:Z", "S", "S_DAG"]) {
+    assert.ok(gltf.meshes.some(mesh => mesh.primitives.some(primitive =>
+      gltf.accessors[primitive.attributes.TEXCOORD_0]?.name === `tex_coords_gate_${name}`
+    )), `missing native 3D glyph ${name}`);
+  }
+  assert.ok(gltf.accessors.some(accessor => accessor.name === "label_0.25"));
+  assert.equal(new Set(gltf.textures.map(texture => texture.source)).size, 2);
+  for (const image of gltf.images) assert.ok(image.uri.startsWith("data:image/png;base64,"));
 });

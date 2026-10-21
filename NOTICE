@@ -4,11 +4,12 @@ Copyright (c) 2026 QuEra Computing Inc
 This product bundles a WebAssembly build of Stim in wasm/out/.
 
 Stim
-  https://github.com/quantumlib/Stim
+  https://github.com/QuEraComputing/Stim
+  Fork of https://github.com/quantumlib/Stim
   Copyright The Stim authors and Google LLC
   Licensed under the Apache License, Version 2.0.
   The source is vendored as a git submodule under third_party/Stim, pinned to
-  v1.16.0. A copy of the Apache 2.0 license is included at
+  the revision recorded by Git. A copy of the Apache 2.0 license is included at
   LICENSE-Stim.txt.
 
 Emscripten and WebAssembly runtime libraries
@@ -18,12 +19,6 @@ Emscripten and WebAssembly runtime libraries
   from the local Emscripten 6.0.1 SDK are included in LICENSE-Emscripten.txt,
   LICENSE-musl.txt, LICENSE-libcxx.txt, LICENSE-libcxxabi.txt, and
   LICENSE-compiler-rt.txt.
-
-@xmldom/xmldom
-  https://github.com/xmldom/xmldom
-  Licensed under the MIT License.
-  Bundled into the extension host code. A copy of the license and copyright
-  notices is included at LICENSE-xmldom.txt.
 
 three.js
   https://github.com/mrdoob/three.js
