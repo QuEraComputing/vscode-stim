@@ -36,6 +36,22 @@
     "onLanguage:dem"
   ],
   "contributes": {
+    "configuration": {
+      "title": "Stim",
+      "properties": {
+        "stim.svgZoomMode": {
+          "type": "string",
+          "enum": ["ctrlScroll", "scroll"],
+          "default": "ctrlScroll",
+          "enumDescriptions": [
+            "Hold Ctrl or Cmd while scrolling to zoom. Plain scrolling pans, or changes layers in single-layer slice views.",
+            "Scroll to zoom and drag with the left mouse button to pan. Use the layer controls or keyboard to change slice layers."
+          ],
+          "description": "Mouse-wheel behavior in SVG circuit and detector error model viewers. Dragging pans in either mode. Does not affect 3D viewers. Changes apply immediately to open viewers.",
+          "scope": "resource"
+        }
+      }
+    },
     "languages": [
       {
         "id": "stim",
@@ -100,6 +116,8 @@
     "test:grammar": "vscode-tmgrammar-test \"test/grammar/*.{stim,tsim}\"",
     "build:test": "tsc src/stimEngine.ts src/tsim.ts --outDir dist-test --module nodenext --target ES2021 --moduleResolution nodenext --skipLibCheck",
     "test:engine": "npm run build:test && node --test test/engine.test.mjs test/tsim.test.mjs test/editor.test.mjs",
+    "test:ui": "extest setup-and-run",
+    "test:viewer": "node --test test/viewer.test.mjs",
     "vscode:prepublish": "node esbuild.js --production"
   },
   "devDependencies": {
@@ -107,7 +125,10 @@
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.6.0",
     "esbuild": "^0.28.1",
+    "mocha": "12.0.2",
+    "ovsx": "1.2.0",
     "typescript": "^5.4.0",
+    "vscode-extension-tester": "8.27.0",
     "vscode-tmgrammar-test": "^0.1.3"
   }
 }

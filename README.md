@@ -30,6 +30,18 @@ Toggle between different visualization types in the visualization panel.
 ![Screenshot of the Stim VS Code extension](https://github.com/QuEraComputing/vscode-stim/blob/5dd52a3042384879ef94827b30ad6c78b45894d1/media/screenshot1.png?raw=true)
 
 
+## SVG navigation
+
+By default, hold **Ctrl** (or **Cmd** on macOS) while scrolling to zoom. Plain scrolling pans, except in single-layer slice views where it changes layers. Left-button dragging pans in either mode.
+
+To zoom with plain scrolling instead, open VS Code Settings and set **Stim: Svg Zoom Mode** to **scroll**, or add this to your user or workspace settings:
+
+```json
+"stim.svgZoomMode": "scroll"
+```
+
+This applies immediately to open SVG viewers, including `.dem` matching graphs. In this mode, use the layer controls or keyboard to change slice layers. Set the value back to `ctrlScroll` to restore the default. Interactive 3D viewers are unaffected.
+
 ## Tsim support
 
 The `.stim` and `.tsim` extensions share the same language mode, syntax highlighting, editor features, and circuit visualizer. No file association setting or Python installation is needed.
@@ -72,20 +84,36 @@ npm run watch         # rebuild the extension on change
 npm run test:grammar  # TextMate grammar tests
 npm run test:wasm     # WebAssembly engine smoke tests
 npm run test:engine   # engine wrapper tests
+npm run test:viewer   # SVG viewer interaction and settings tests
 ```
+
+### UI tests
+
+The UI suite uses [VS Code Extension Tester](https://github.com/redhat-developer/vscode-extension-tester) and Mocha to drive a real VS Code window with Selenium. It packages and installs the extension into an isolated test profile, then exercises `.stim`, `.tsim`, and `.dem` files, SVG controls, zoom/pan, and error recovery on save.
+
+With Node.js 22+ and a graphical desktop, run:
+
+```bash
+npm ci
+npm run test:ui
+```
+
+On headless Linux, use `xvfb-run -a npm run test:ui`. The first run downloads the VS Code and ChromeDriver versions selected in `extester.config.json`; later runs reuse those downloads. Your normal VS Code profile and extensions are not modified. Test files are copied into `.ui-tests/workspace` before editing.
+
+The suite intentionally excludes CDN-dependent 3D views and OS clipboard integration. Failures produce screenshots, DOM snapshots, and VS Code/WebDriver logs under `.ui-tests/`; CI uploads these as the `ui-test-diagnostics` artifact. Runtime downloads and test artifacts are ignored by Git and excluded from the VSIX.
 
 ## Release
 
-VSIX files are built by GitHub Actions and must not be committed. To publish a release, push a version tag:
+GitHub Actions tests and packages the extension, attaches the VSIX to a GitHub release, and publishes the same package to Open VSX and the VS Code Marketplace. Complete the [one-time publisher setup](.github/RELEASING.md) first.
+
+Update `package.json` and `package-lock.json` to the next numeric `major.minor.patch` version, commit and push the changes, then push the matching tag. For example, for version `0.1.1`:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
-The release workflow packages the extension and attaches the generated VSIX to the GitHub release.
-
-To publish to the VS Code Marketplace, upload that VSIX through the [QuEra Computing publisher portal](https://marketplace.visualstudio.com/manage/publishers/QuEraComputing). GitHub releases do not automatically publish to the Marketplace. The package version must match the tag and use a numeric `major.minor.patch` version.
+The workflow rejects tags that do not match the package version. Registry publishing runs in independent jobs; rerun failed jobs after resolving any authentication errors. Already published versions are skipped. A manual run on a branch only builds a VSIX unless the Marketplace setup check is selected; that check authenticates without publishing. VSIX files must not be committed.
 
 ## Notes
 

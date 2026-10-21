@@ -33,8 +33,9 @@
     decomposeErrors: false,
     full: false,
     tick: 1,
-    tickMax: 0,
+    tickMax: null, // last slice index; null until a slice render reports it
     rows: 0,
+    svgZoomMode: "ctrlScroll",
   };
 
   function isDimCapable() {
@@ -69,6 +70,7 @@
       btn.addEventListener("click", () => {
         if (state.base === b.id) return;
         state.base = b.id;
+        state.tickMax = null; // unknown until the new base renders
         updateControls();
         renderSegmented();
         vscode.postMessage({ command: "setBase", base: b.id });
@@ -164,7 +166,8 @@
   function setTick(t) {
     let next = Math.floor(t);
     if (!Number.isFinite(next) || next < 0) next = 0;
-    if (state.tickMax > 0) next = Math.min(next, state.tickMax);
+    // With the range still unknown, the host clamps and echoes the tick back.
+    if (state.tickMax !== null) next = Math.min(next, state.tickMax);
     const changed = next !== state.tick;
     state.tick = next;
     tickValue.value = String(next); // mirror the clamped value back into the box
@@ -192,7 +195,7 @@
 
   function updateTickButtons() {
     tickPrev.disabled = state.tick <= 0;
-    tickNext.disabled = state.tickMax > 0 && state.tick >= state.tickMax;
+    tickNext.disabled = state.tickMax !== null && state.tick >= state.tickMax;
   }
 
   // Keyboard navigation through the tick/layer stepper. Active only when the
@@ -207,7 +210,7 @@
   window.addEventListener("keydown", (e) => {
     if (!isTickDependent() || state.full) return;
     if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
-    const last = state.tickMax > 0 ? state.tickMax : 1e6;
+    const last = state.tickMax ?? Number.MAX_SAFE_INTEGER;
     const key = e.key.toLowerCase();
     let handled = true;
     if (e.key === "ArrowRight" || key === "e") {
@@ -224,10 +227,8 @@
     if (handled) e.preventDefault();
   });
 
-  // Wrap a raw SVG string in a zoomable, scrollable container. Ctrl/Cmd + wheel
-  // (and trackpad pinch, which the browser reports as ctrl+wheel) zooms toward
-  // the cursor; plain wheel scroll and click-and-drag both pan. Ported from the
-  // tsim wrap_svg_zoomable helper.
+  // Ctrl/Cmd + wheel and trackpad pinch always zoom toward the cursor.
+  // The scroll mode also zooms without a modifier; dragging pans in both modes.
   // opts: { fill } to fill the panel (fit the whole SVG into the available
   // area, used for the single view) or { height } for a fixed-height box
   // (used for each item in full mode).
@@ -296,7 +297,7 @@
     wrap.addEventListener(
       "wheel",
       (e) => {
-        if (e.ctrlKey || e.metaKey) {
+        if (state.svgZoomMode === "scroll" || e.ctrlKey || e.metaKey) {
           e.preventDefault();
           const rect = wrap.getBoundingClientRect();
           const mx = e.clientX - rect.left + wrap.scrollLeft;
@@ -327,8 +328,7 @@
       { passive: false }
     );
 
-    // Click-and-drag to pan (left button, no modifier). Plain wheel scrolling is
-    // left to the container's native overflow handling.
+    // Click-and-drag to pan with the left button in either zoom mode.
     let dragging = false;
     let startX = 0;
     let startY = 0;
@@ -503,6 +503,7 @@
   window.addEventListener("message", (event) => {
     const msg = event.data;
     if (msg.command === "init") {
+      state.svgZoomMode = msg.svgZoomMode === "scroll" ? "scroll" : "ctrlScroll";
       state.kind = msg.kind || "circuit";
       state.bases = msg.bases;
       state.tickDependentBases = msg.tickDependentBases;
@@ -520,6 +521,8 @@
       rowsInput.value = state.rows > 0 ? String(state.rows) : "";
       renderSegmented();
       updateControls();
+    } else if (msg.command === "configuration") {
+      state.svgZoomMode = msg.svgZoomMode === "scroll" ? "scroll" : "ctrlScroll";
     } else if (msg.command === "html") {
       showHtml(msg.html);
     } else if (msg.command === "svg") {
@@ -531,7 +534,7 @@
           tickValue.value = String(state.tick);
         }
       }
-      if (typeof msg.tickMax === "number") state.tickMax = msg.tickMax;
+      if (msg.tickMax !== undefined) state.tickMax = msg.tickMax;
       updateTickButtons();
       showSingle(msg.svg);
     } else if (msg.command === "error") {
