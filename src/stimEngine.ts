@@ -25,6 +25,16 @@ export const TICK_DEPENDENT: ReadonlySet<string> = new Set([
   "detslice-with-ops-svg",
 ]);
 
+// Views that stim only builds for Clifford circuits. Legacy tagged gates
+// (S[T], I[R_X(theta=...)], ...) are left encoded for these so they keep
+// rendering as their Clifford stand-ins instead of erroring as native gates.
+export const CLIFFORD_ONLY: ReadonlySet<string> = new Set([
+  "detslice-svg",
+  "detslice-with-ops-svg",
+  "matchgraph-svg",
+  "matchgraph-3d-html",
+]);
+
 // C++ emits this sentinel prefix (0x01 "ERROR" 0x01) for caught errors.
 const ERROR_SENTINEL = "\x01ERROR\x01";
 

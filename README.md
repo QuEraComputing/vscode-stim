@@ -52,7 +52,7 @@ The bundled QuEra Stim fork renders all of these instructions directly in 2D tim
 
 Autocomplete, hover documentation, and signature help use the fork's complete gate table, including non-Clifford instructions and aliases such as `R_PAULI` and `U`.
 
-Detector slices and matching graphs require Clifford circuits and report errors for non-Clifford gates. The 3D timeline also renders all of these gates, including rotation angles and controlled-gate connections. `TPP`, `TPP_DAG`, `R_XX`, `R_YY`, `R_ZZ`, and `R_PAULI`/`RPP` are visualization-only instructions; this extension does not expose a circuit simulator.
+Detector slices and matching graphs require Clifford circuits and report errors for native non-Clifford gates. Gates written in the older tagged form (for example `S[T]` or `I[R_X(theta=0.25*pi)]`) stay tagged in these views, so they render as their Clifford stand-ins. The 3D timeline also renders all of these gates, including rotation angles and controlled-gate connections. `TPP`, `TPP_DAG`, `R_XX`, `R_YY`, `R_ZZ`, and `R_PAULI`/`RPP` are visualization-only instructions; this extension does not expose a circuit simulator.
 
 ## Install from source
 

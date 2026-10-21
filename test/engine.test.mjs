@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert";
 import {
   renderDiagram, renderDiagramFull, countTicks, countTrailingTicks, lastSliceTick,
-  SVG_DIAGRAM_TYPES, TICK_DEPENDENT,
+  SVG_DIAGRAM_TYPES, TICK_DEPENDENT, CLIFFORD_ONLY,
 } from "../dist-test/stimEngine.js";
 
 const SAMPLE = "H 0\nTICK\nCX 0 1\nM 0 1\nDETECTOR rec[-1] rec[-2]\n";
@@ -87,4 +87,16 @@ test("renderDiagramFull combines all ticks and respects rows", async () => {
   assert.ok(wide.includes("<svg"));
   const vb = (s) => /viewBox="[^"]*\s([\d.]+)\s+([\d.]+)"/.exec(s)[0];
   assert.notStrictEqual(vb(wide), vb(tall));
+});
+
+test("Clifford-only views render legacy tagged gates but reject native ones", async () => {
+  const tagged = "R 0 1\nI[R_X(theta=0.25*pi)] 0\nS[T] 1\nX_ERROR(0.1) 0\nM 0 1\nDETECTOR rec[-1]\n";
+  const native = "R 0 1\nR_X(0.25) 0\nT 1\nX_ERROR(0.1) 0\nM 0 1\nDETECTOR rec[-1]\n";
+  assert.deepStrictEqual([...CLIFFORD_ONLY].sort(), [
+    "detslice-svg", "detslice-with-ops-svg", "matchgraph-3d-html", "matchgraph-svg",
+  ]);
+  for (const type of CLIFFORD_ONLY) {
+    assert.ok((await renderDiagram(tagged, type, 0)).length > 0, type);
+    await assert.rejects(renderDiagram(native, type, 0), /Clifford/, type);
+  }
 });

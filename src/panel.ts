@@ -12,6 +12,7 @@ import {
   getDemStats,
   getCircuitDemStats,
   isHtmlDiagram,
+  CLIFFORD_ONLY,
   DiagramType,
   DemDiagramType,
 } from "./stimEngine";
@@ -275,7 +276,8 @@ export class StimPanel {
       this.base !== "matchgraph" && !(this.base === "detslice" && !this.withOps);
     const withoutNoise = noiseApplies && this.withoutNoise;
     try {
-      const text = toNativeStim(this.doc.getText());
+      const raw = this.doc.getText();
+      const text = CLIFFORD_ONLY.has(type) ? raw : toNativeStim(raw);
       void this.sendStats(text, seq);
       // Check parseability up front so every diagram path reports the offending
       // line(s) instead of stim's opaque error (or a bare "could not parse").
