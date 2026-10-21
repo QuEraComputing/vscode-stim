@@ -36,6 +36,22 @@
     "onLanguage:dem"
   ],
   "contributes": {
+    "configuration": {
+      "title": "Stim",
+      "properties": {
+        "stim.svgZoomMode": {
+          "type": "string",
+          "enum": ["ctrlScroll", "scroll"],
+          "default": "ctrlScroll",
+          "enumDescriptions": [
+            "Hold Ctrl or Cmd while scrolling to zoom. Plain scrolling pans, or changes layers in single-layer slice views.",
+            "Scroll to zoom and drag with the left mouse button to pan. Use the layer controls or keyboard to change slice layers."
+          ],
+          "description": "Mouse-wheel behavior in SVG circuit and detector error model viewers. Dragging pans in either mode. Does not affect 3D viewers. Changes apply immediately to open viewers.",
+          "scope": "resource"
+        }
+      }
+    },
     "languages": [
       {
         "id": "stim",
@@ -101,6 +117,7 @@
     "build:test": "tsc src/stimEngine.ts src/tsim.ts --outDir dist-test --module nodenext --target ES2021 --moduleResolution nodenext --skipLibCheck",
     "test:engine": "npm run build:test && node --test test/engine.test.mjs test/tsim.test.mjs",
     "test:ui": "extest setup-and-run",
+    "test:viewer": "node --test test/viewer.test.mjs",
     "vscode:prepublish": "node esbuild.js --production"
   },
   "devDependencies": {

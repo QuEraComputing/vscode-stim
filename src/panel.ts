@@ -115,6 +115,23 @@ export class StimPanel {
       this.disposables
     );
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+    vscode.workspace.onDidChangeConfiguration(
+      (event) => {
+        if (event.affectsConfiguration("stim.svgZoomMode", this.doc.uri)) {
+          void this.panel.webview.postMessage({
+            command: "configuration",
+            svgZoomMode: this.svgZoomMode(),
+          });
+        }
+      },
+      null,
+      this.disposables
+    );
+  }
+
+  private svgZoomMode(): "ctrlScroll" | "scroll" {
+    const mode = vscode.workspace.getConfiguration("stim", this.doc.uri).get("svgZoomMode");
+    return mode === "scroll" ? "scroll" : "ctrlScroll";
   }
 
   // Restore the last-used toolbar selections (if any).
@@ -187,6 +204,7 @@ export class StimPanel {
       const dem = this.kind === "dem";
       this.panel.webview.postMessage({
         command: "init",
+        svgZoomMode: this.svgZoomMode(),
         kind: this.kind,
         // A DEM only supports the match graph; circuits get the full set.
         bases: dem ? BASE_TYPES.filter((b) => b.id === "matchgraph") : BASE_TYPES,

@@ -35,6 +35,9 @@ jobs:
       - name: Engine + tsim tests
         run: npm run test:engine
 
+      - name: Viewer interaction tests
+        run: npm run test:viewer
+
       - name: Package (smoke)
         run: npx @vscode/vsce package -o stim-vscode.vsix
 

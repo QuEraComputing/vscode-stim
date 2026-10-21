@@ -35,6 +35,7 @@
     tick: 1,
     tickMax: null, // last slice index; null until a slice render reports it
     rows: 0,
+    svgZoomMode: "ctrlScroll",
   };
 
   function isDimCapable() {
@@ -226,10 +227,8 @@
     if (handled) e.preventDefault();
   });
 
-  // Wrap a raw SVG string in a zoomable, scrollable container. Ctrl/Cmd + wheel
-  // (and trackpad pinch, which the browser reports as ctrl+wheel) zooms toward
-  // the cursor; plain wheel scroll and click-and-drag both pan. Ported from the
-  // tsim wrap_svg_zoomable helper.
+  // Ctrl/Cmd + wheel and trackpad pinch always zoom toward the cursor.
+  // The scroll mode also zooms without a modifier; dragging pans in both modes.
   // opts: { fill } to fill the panel (fit the whole SVG into the available
   // area, used for the single view) or { height } for a fixed-height box
   // (used for each item in full mode).
@@ -298,7 +297,7 @@
     wrap.addEventListener(
       "wheel",
       (e) => {
-        if (e.ctrlKey || e.metaKey) {
+        if (state.svgZoomMode === "scroll" || e.ctrlKey || e.metaKey) {
           e.preventDefault();
           const rect = wrap.getBoundingClientRect();
           const mx = e.clientX - rect.left + wrap.scrollLeft;
@@ -329,8 +328,7 @@
       { passive: false }
     );
 
-    // Click-and-drag to pan (left button, no modifier). Plain wheel scrolling is
-    // left to the container's native overflow handling.
+    // Click-and-drag to pan with the left button in either zoom mode.
     let dragging = false;
     let startX = 0;
     let startY = 0;
@@ -505,6 +503,7 @@
   window.addEventListener("message", (event) => {
     const msg = event.data;
     if (msg.command === "init") {
+      state.svgZoomMode = msg.svgZoomMode === "scroll" ? "scroll" : "ctrlScroll";
       state.kind = msg.kind || "circuit";
       state.bases = msg.bases;
       state.tickDependentBases = msg.tickDependentBases;
@@ -522,6 +521,8 @@
       rowsInput.value = state.rows > 0 ? String(state.rows) : "";
       renderSegmented();
       updateControls();
+    } else if (msg.command === "configuration") {
+      state.svgZoomMode = msg.svgZoomMode === "scroll" ? "scroll" : "ctrlScroll";
     } else if (msg.command === "html") {
       showHtml(msg.html);
     } else if (msg.command === "svg") {
