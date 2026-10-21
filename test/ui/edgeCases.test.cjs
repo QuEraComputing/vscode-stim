@@ -19,12 +19,13 @@ describe("Visualizer edge-case regressions", () => {
 
   useEditorHooks();
 
-  it("reports Tsim lowering errors and recovers after correction", async () => {
+  it("reports invalid Tsim gate targets and recovers after correction", async () => {
     const view = await openVisualizer("invalid-gates.tsim");
     const stats = async () => (await find("#info-tip")).getAttribute("textContent");
+    // Native Stim validates Tsim gates itself; its reason is shown verbatim.
     for (const [source, message] of [
-      ["CCX 0 1\n", /groups of three on the following line:\s+CCX 0 1/],
-      ["R_XX(0.25) 0 0\n", /must be distinct on the following line:\s+R_XX\(0\.25\) 0 0/],
+      ["CCX 0 1\n", /CCX requires a multiple of 3 targets but was given \(0, 1\)/],
+      ["R_XX(0.25) 0 0\n", /R_XX was applied to a target pair with the same target \(0\) twice/],
     ]) {
       await editAndSave(view, "invalid-gates.tsim", source);
       const error = await driver().wait(until.elementLocated(By.css("#view .error")), 15000);

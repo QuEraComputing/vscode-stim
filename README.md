@@ -2,7 +2,7 @@
 
 Syntax highlighting and interactive circuit visualization for [Stim](https://github.com/quantumlib/Stim) and [Tsim](https://github.com/QuEraComputing/tsim) circuits in `.stim` and `.tsim` files, plus `.dem` detector error models.
 
-Diagrams are produced by Stim's C++ core compiled to WebAssembly and run entirely inside the editor with no Python or native dependencies. Tsim circuits use the extension's existing non-Clifford gate translation; see [Tsim support](#tsim-support) for its visualization limits.
+Diagrams are produced by Stim's C++ core compiled to WebAssembly and run entirely inside the editor with no Python or native dependencies. The bundled [QuEra Stim fork](https://github.com/QuEraComputing/Stim) draws non-Clifford gates natively; see [Tsim support](#tsim-support) for view-specific limits.
 
 ## Features
 
@@ -48,7 +48,11 @@ The `.stim` and `.tsim` extensions share the same language mode, syntax highligh
 
 The grammar highlights all additional instructions currently documented by [Tsim](https://github.com/QuEraComputing/tsim#supported-instructions): `T`, `T_DAG`, `TPP`, `TPP_DAG`, `R_X`, `R_Y`, `R_Z`, `R_XX`, `R_YY`, `R_ZZ`, `R_PAULI`, `U3`, `CCZ`, and `CCX`. Signed decimal and scientific-notation arguments, Pauli-product targets, and instruction tags are highlighted too.
 
-Visualization is not full non-Clifford simulation. The 2D operation views relabel T-family and single-qubit rotation gates; `CCZ` and `CCX` are expanded into Clifford+T decompositions. Pauli rotations (`R_XX`, `R_YY`, `R_ZZ`, and `R_PAULI`) currently appear as tagged `SPP` operations. Other views, including detector slices and matching graphs, use Clifford stand-ins (for example, `T` becomes `S` and single-qubit rotations become identity), so they do not represent the exact non-Clifford circuit. Autocomplete, hover documentation, and signature help currently cover Stim's gate table, not the additional Tsim instructions.
+The bundled QuEra Stim fork renders all of these instructions directly in 2D timeline and time-slice views, including controlled gates and Pauli-product rotations. Rotation angles are in half-turns (multiply by π for radians). Older circuits that encode Tsim gates in Stim tags are still supported.
+
+Autocomplete, hover documentation, and signature help use the fork's complete gate table, including non-Clifford instructions and aliases such as `R_PAULI` and `U`.
+
+Detector slices and matching graphs require Clifford circuits and report errors for native non-Clifford gates. Gates written in the older tagged form (for example `S[T]` or `I[R_X(theta=0.25*pi)]`) stay tagged in these views, so they render as their Clifford stand-ins. The 3D timeline also renders all of these gates, including rotation angles and controlled-gate connections. `TPP`, `TPP_DAG`, `R_XX`, `R_YY`, `R_ZZ`, and `R_PAULI`/`RPP` are visualization-only instructions; this extension does not expose a circuit simulator.
 
 ## Install from source
 
@@ -63,7 +67,7 @@ Then press `F5` in VS Code to launch an Extension Development Host with the exte
 
 The compiled engine (`wasm/out/stim_diagram.{js,wasm}`) is checked in with LFS, so building it is only needed when changing the binding or updating Stim.
 
-Requirements: the [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) on your `PATH` (`em++`). Stim's source is vendored as a submodule pinned to `v1.16.0`.
+Requirements: the [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) on your `PATH` (`em++`). The [QuEra Stim fork](https://github.com/QuEraComputing/Stim) is vendored as a submodule at `third_party/Stim`, pinned to the revision recorded by Git.
 
 ```bash
 git submodule update --init

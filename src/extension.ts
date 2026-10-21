@@ -111,7 +111,7 @@ class StimHoverProvider implements vscode.HoverProvider {
     } catch {
       return undefined;
     }
-    const g = map.get(document.getText(range));
+    const g = map.get(document.getText(range).toUpperCase());
     if (!g) {
       return undefined;
     }
@@ -149,7 +149,7 @@ class StimSignatureHelpProvider implements vscode.SignatureHelpProvider {
     } catch {
       return undefined;
     }
-    const g = map.get(nameMatch[1]);
+    const g = map.get(nameMatch[1].toUpperCase());
     if (!g || g.args === 0) {
       return undefined;
     }

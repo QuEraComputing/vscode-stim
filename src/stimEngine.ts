@@ -25,6 +25,16 @@ export const TICK_DEPENDENT: ReadonlySet<string> = new Set([
   "detslice-with-ops-svg",
 ]);
 
+// Views that stim only builds for Clifford circuits. Legacy tagged gates
+// (S[T], I[R_X(theta=...)], ...) are left encoded for these so they keep
+// rendering as their Clifford stand-ins instead of erroring as native gates.
+export const CLIFFORD_ONLY: ReadonlySet<string> = new Set([
+  "detslice-svg",
+  "detslice-with-ops-svg",
+  "matchgraph-svg",
+  "matchgraph-3d-html",
+]);
+
 // C++ emits this sentinel prefix (0x01 "ERROR" 0x01) for caught errors.
 const ERROR_SENTINEL = "\x01ERROR\x01";
 
@@ -46,7 +56,6 @@ interface StimModule {
     decomposeErrors: boolean
   ): string;
   count_ticks(text: string): number;
-  without_noise_text(text: string): string;
   circuit_stats_json(text: string): string;
   dem_diagram(text: string, type: string): string;
   dem_stats_json(text: string): string;
@@ -223,16 +232,6 @@ export async function getCircuitStats(circuitText: string): Promise<CircuitStats
     modulePromise = undefined;
     throw new Error(`stim failed to read circuit stats: ${String(e?.message ?? e)}`);
   }
-}
-
-// The circuit with all noise operations removed (gate tags preserved).
-export async function withoutNoiseText(circuitText: string): Promise<string> {
-  const mod = await loadModule();
-  const result = mod.without_noise_text(circuitText);
-  if (result.startsWith(ERROR_SENTINEL)) {
-    throw new Error(result.slice(ERROR_SENTINEL.length));
-  }
-  return result;
 }
 
 // Number of TICK instructions in the circuit (-1 if it cannot be parsed).

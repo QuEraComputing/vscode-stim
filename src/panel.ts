@@ -8,15 +8,15 @@ import {
   renderDiagramFull,
   renderDemDiagram,
   lastSliceTick,
-  withoutNoiseText,
   getCircuitStats,
   getDemStats,
   getCircuitDemStats,
   isHtmlDiagram,
+  CLIFFORD_ONLY,
   DiagramType,
   DemDiagramType,
 } from "./stimEngine";
-import { shorthandToStim, toPlaceholders, relabelSvg, explainStimError } from "./tsim";
+import { toNativeStim, explainStimError } from "./tsim";
 
 // Base diagram families shown in the segmented control. The actual stim
 // diagram-type string is derived from the base plus its sub-toggles.
@@ -268,30 +268,17 @@ export class StimPanel {
       await this.refreshDem(this.doc.getText(), seq);
       return;
     }
-    // Lower tsim shorthand (T, R_X, ...) to tagged stim. Used for every stim
-    // call so the circuit parses and simulates as its Clifford stand-in.
-    let text: string;
-    try {
-      text = shorthandToStim(this.doc.getText());
-    } catch (e: any) {
-      this.postStats(seq, null);
-      this.post(seq, { command: "error", message: String(e?.message ?? e) });
-      return;
-    }
-    void this.sendStats(text, seq);
     const type = this.currentType();
     const dependent = this.isTickDependent();
-    // tsim gates are relabeled only on the pure-layout op diagrams.
-    const relabel = type === "timeline-svg" || type === "timeslice-svg";
     // "without noise" only applies where the toggle is shown: not for the match
     // graph (built from the noise), and for detslice only with the ops overlay.
     const noiseApplies =
       this.base !== "matchgraph" && !(this.base === "detslice" && !this.withOps);
-    const wantNoiseStrip = noiseApplies && this.withoutNoise;
-    // On the relabel path the placeholders are themselves I_ERROR ops, so we
-    // strip noise from the circuit up front instead of during the render.
-    const withoutNoise = relabel ? false : wantNoiseStrip;
+    const withoutNoise = noiseApplies && this.withoutNoise;
     try {
+      const raw = this.doc.getText();
+      const text = CLIFFORD_ONLY.has(type) ? raw : toNativeStim(raw);
+      void this.sendStats(text, seq);
       // Check parseability up front so every diagram path reports the offending
       // line(s) instead of stim's opaque error (or a bare "could not parse").
       const parseProblem = await this.parseError(text);
@@ -316,15 +303,6 @@ export class StimPanel {
         }
       }
 
-      // For relabeled diagrams, render placeholders then swap them for gate
-      // labels; otherwise render the lowered circuit directly. When "without
-      // noise" is on, strip noise from the circuit before making placeholders
-      // (the placeholders are noise ops themselves).
-      const baseText = relabel && wantNoiseStrip ? await withoutNoiseText(text) : text;
-      const ph = relabel ? toPlaceholders(baseText) : null;
-      const src = ph ? ph.text : text;
-      const finish = (svg: string) => (ph ? relabelSvg(svg, ph.labels) : svg);
-
       if (isHtmlDiagram(type)) {
         // Interactive 3D viewer: a full HTML page rendered in an iframe.
         const html = await renderDiagram(
@@ -334,11 +312,11 @@ export class StimPanel {
       } else if (this.full && dependent) {
         // One combined diagram of every tick, laid out in `rows` rows.
         const svg = await renderDiagramFull(
-          src, type, this.rows, withoutNoise, this.approxDisjoint, this.decomposeErrors
+          text, type, this.rows, withoutNoise, this.approxDisjoint, this.decomposeErrors
         );
         this.post(seq, {
           command: "svg",
-          svg: finish(svg),
+          svg,
           type,
           tick,
           tickMax,
@@ -346,11 +324,11 @@ export class StimPanel {
         });
       } else {
         const svg = await renderDiagram(
-          src, type, tick, withoutNoise, this.approxDisjoint, this.decomposeErrors
+          text, type, tick, withoutNoise, this.approxDisjoint, this.decomposeErrors
         );
         this.post(seq, {
           command: "svg",
-          svg: finish(svg),
+          svg,
           type,
           tick,
           tickMax,
@@ -370,7 +348,7 @@ export class StimPanel {
     }
   }
 
-  // A user-facing explanation of why the (lowered) circuit can't be parsed, or
+  // A user-facing explanation of why the circuit can't be parsed, or
   // null if it parses. Asks stim, then maps its error to the offending line.
   private async parseError(text: string): Promise<string | null> {
     const stats = await getCircuitStats(text);

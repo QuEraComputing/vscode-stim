@@ -1,5 +1,7 @@
 *.vsix
 AGENTS.md
+.claude/**
+.ui-tests/**
 .vscode/**
 .github/**
 .claude/**

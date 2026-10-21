@@ -232,16 +232,17 @@ static std::string circuit_dem_stats_json(
 static std::string gate_data_json() {
     std::string out = "[";
     bool first = true;
-    for (const auto &g : GATE_DATA.items) {
-        if (g.name.empty()) {
+    for (const auto &entry : GATE_DATA.hashed_name_to_gate_type_table) {
+        if (entry.expected_name.empty()) {
             continue;
         }
+        const auto &g = GATE_DATA[entry.id];
         if (!first) {
             out += ",";
         }
         first = false;
         out += "{\"name\":\"";
-        json_escape_to(g.name, out);
+        json_escape_to(entry.expected_name, out);
         out += "\",\"category\":\"";
         json_escape_to(g.category, out);
         out += "\",\"args\":";
@@ -252,20 +253,6 @@ static std::string gate_data_json() {
     }
     out += "]";
     return out;
-}
-
-// Returns the circuit text with all noise operations removed (stim's
-// Circuit::without_noise), preserving gate tags. Lets the tsim relabel path
-// strip user noise before inserting I_ERROR placeholders.
-static std::string without_noise_text(std::string circuit_text) {
-    try {
-        Circuit c{std::string_view(circuit_text)};
-        std::ostringstream out;
-        out << c.without_noise();
-        return out.str();
-    } catch (const std::exception &e) {
-        return ERROR_PREFIX + e.what();
-    }
 }
 
 // Returns the number of TICK instructions in the circuit, or -1 if the
@@ -305,7 +292,6 @@ EMSCRIPTEN_BINDINGS(stim_diagram) {
     function("diagram", &diagram);
     function("diagram_full", &diagram_full);
     function("count_ticks", &count_ticks);
-    function("without_noise_text", &without_noise_text);
     function("circuit_stats_json", &circuit_stats_json);
     function("dem_diagram", &dem_diagram);
     function("dem_stats_json", &dem_stats_json);
